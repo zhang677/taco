@@ -1886,4 +1886,170 @@ IndexStmt insertTemporaries(IndexStmt stmt)
   return stmt;
 }
 
+    IndexStmt BypassOptimizeSpMM(IndexStmt stmt){
+
+        // Input: C(i,k) = A(i,j) * B(j,k)
+        if (!isa<Forall>(stmt)) {
+            return stmt;
+        }
+        Forall foralli = to<Forall>(stmt);
+        IndexVar i = foralli.getIndexVar();
+
+        if (!isa<Forall>(foralli.getStmt())) {
+            return stmt;
+        }
+        Forall forallk = to<Forall>(foralli.getStmt());
+        IndexVar k = forallk.getIndexVar();
+
+        if (!isa<Forall>(forallk.getStmt())) {
+            return stmt;
+        }
+        Forall forallj = to<Forall>(forallk.getStmt());
+        IndexVar j = forallj.getIndexVar();
+
+        if (!isa<Assignment>(forallj.getStmt())) {
+            return stmt;
+        }
+        Assignment assignment = to<Assignment>(forallj.getStmt());
+
+        if (!isa<Mul>(assignment.getRhs())) {
+            return stmt;
+        }
+        Mul mul = to<Mul>(assignment.getRhs());
+
+        taco_iassert(isa<Access>(assignment.getLhs()));
+        if (!isa<Access>(mul.getA())) {
+            return stmt;
+        }
+        if (!isa<Access>(mul.getB())) {
+            return stmt;
+        }
+
+        Access Caccess = to<Access>(assignment.getLhs());
+        Access Aaccess = to<Access>(mul.getA());
+        Access Baccess = to<Access>(mul.getB());
+
+        if (Aaccess.getIndexVars().size() != 2 ||
+            Baccess.getIndexVars().size() != 2 ||
+            Caccess.getIndexVars().size() != 2) {
+            return stmt;
+        }
+
+        if (!compare(Aaccess.getIndexVars(), {i,j}) ||
+            !compare(Baccess.getIndexVars(), {j,k}) ||
+            !compare(Caccess.getIndexVars(), {i,k})) {
+            return stmt;
+        }
+
+        TensorVar A = Aaccess.getTensorVar();
+        if (A.getFormat().getModeFormats()[0].getName() != "dense" ||
+            A.getFormat().getModeFormats()[1].getName() != "compressed" ||
+            A.getFormat().getModeOrdering()[0] != 0 ||
+            A.getFormat().getModeOrdering()[1] != 1) {
+            return stmt;
+        }
+
+        TensorVar B = Baccess.getTensorVar();
+        if (!B.getFormat().getModeFormats()[0].isOrdered() ||
+            !B.getFormat().getModeFormats()[1].isOrdered()
+                ) {
+            return stmt;
+        }
+
+        TensorVar C = Caccess.getTensorVar();
+        if (!C.getFormat().getModeFormats()[0].isOrdered() ||
+            !C.getFormat().getModeFormats()[1].isOrdered()
+                ) {
+            return stmt;
+        }
+        IndexVar f("f"),fpos("fpos"),block("block"),fpos1("fpos1"),warp("warp"),nnz("nnz"),ko("ko"),thread("thread"),dense_val("dense_val");
+        TensorVar tnnz_val("tnnz_val",
+                           Type(A.getType().getDataType(),{}),
+                           taco::dense);
+        stmt = stmt.reorder({i, j, k})
+                .fuse(i, j, f)
+                .pos(f, fpos, A(i, j))
+                .split(fpos, block, fpos1, 256)
+                .split(fpos1, warp, nnz, 16)
+                .split(k, ko, thread, 32)
+                .reorder({block, warp, thread, ko, nnz})
+                .bound(ko, dense_val, 4, BoundType::MaxExact)
+                .parallelize(block, ParallelUnit::GPUBlock, OutputRaceStrategy::IgnoreRaces)
+                .parallelize(warp, ParallelUnit::GPUWarp, OutputRaceStrategy::IgnoreRaces)
+                .parallelize(thread, ParallelUnit::GPUThread, OutputRaceStrategy::Atomics);
+
+        SuchThat tmp_stmt = to<SuchThat>(stmt);
+        Forall tmp_for = to<Forall>(tmp_stmt.getStmt());
+        IndexVar tmp_val = tmp_for.getIndexVar();
+        do{
+            tmp_for = to<Forall>(tmp_for.getStmt());
+            tmp_val = tmp_for.getIndexVar();
+        }while(tmp_val!=nnz);
+        ForallNode tmp_node(tmp_val,tmp_for,tmp_for.getParallelUnit(),tmp_for.getOutputRaceStrategy(),tmp_for.getUnrollFactor());
+        std::vector<Access> resultAccesses;
+        std::tie(resultAccesses, std::ignore) = getResultAccesses(tmp_for);
+        Access resultAccess = resultAccesses[0];
+        cout<<resultAccess<<endl;
+        cout<<tmp_for<<endl;
+        Assignment tmp_assign = to<Assignment>(tmp_for.getStmt());
+        IndexExpr tmp_op = tmp_assign.getOperator();
+
+
+        struct HoistWrites : public IndexNotationRewriter {
+            using IndexNotationRewriter::visit;
+
+
+            const Forall replaceStmt;
+            const IndexVar replaceVar;
+            const Access resultAccess;
+            const IndexExpr op;
+
+            HoistWrites(
+                    const Forall& tmp_for,
+                    const IndexVar& tmp_var,
+                    const Access& resultAccess,
+                    const IndexExpr& tmp_op) :
+                    replaceStmt(tmp_for), replaceVar(tmp_var)
+                    , resultAccess(resultAccess),op(tmp_op){}
+
+            void visit(const ForallNode* node) {
+                Forall foralli(node);
+                IndexVar i = foralli.getIndexVar();
+                IndexStmt body = rewrite(foralli.getStmt());
+
+                std::vector<IndexStmt> consumers;
+
+                if (replaceStmt == foralli) {
+                    // This assumes the index expression yields at most one result tensor;
+                    // will not work correctly if there are multiple results.
+                    TensorVar resultVar = resultAccess.getTensorVar();
+                    TensorVar val("t" + i.getName() + resultVar.getName(),
+                                  Type(resultVar.getType().getDataType(), {}));
+                    body = ReplaceReductionExpr(
+                            map<Access,Access>({{resultAccess, val()}})).rewrite(body);
+
+                    IndexStmt consumer = Assignment(Access(resultAccess), val(), op);
+                    consumers.push_back(consumer);
+                }
+
+
+                if (body == foralli.getStmt()) {
+                    taco_iassert(consumers.empty());
+                    stmt = node;
+                    return;
+                }
+
+                stmt = forall(i, body, foralli.getParallelUnit(),
+                              foralli.getOutputRaceStrategy(), foralli.getUnrollFactor());
+                for (const auto& consumer : consumers) {
+                    stmt = where(consumer, stmt);
+                }
+            }
+        };
+        HoistWrites hoistWrites(tmp_for,tmp_val,resultAccess,tmp_op);
+        return hoistWrites.rewrite(stmt);
+
+
+    }
+
 }

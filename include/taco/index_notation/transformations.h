@@ -237,5 +237,7 @@ IndexStmt scalarPromote(IndexStmt stmt);
  */
 IndexStmt insertTemporaries(IndexStmt stmt);
 
+IndexStmt BypassOptimizeSpMM(IndexStmt stmt);
+
 }
 #endif

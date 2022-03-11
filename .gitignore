@@ -10,5 +10,6 @@ lib/
 *cmake_install.cmake
 CMakeCache.txt
 doc
-
+*.xml
+*.iml
 apps/tensor_times_vector/tensor_times_vector
