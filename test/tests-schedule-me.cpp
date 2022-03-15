@@ -51,6 +51,23 @@ namespace mytest {
         source_file.close();
     }
 
+    void _printIRtoFile(const string& filename, const IndexStmt& stmt) {
+        stringstream source;
+        string file_path = "eval_generated/";
+        mkdir(file_path.c_str(), 0777);
+        std::shared_ptr<ir::CodeGen> codegen = ir::CodeGen::init_default(source, ir::CodeGen::ImplementationGen);
+        ir::Stmt compute = lower(stmt, "compute",  false, true);
+
+        ofstream source_file;
+        string file_ending=".txt";
+        source_file.open(file_path + filename + file_ending);
+        ir::IRPrinter irp = ir::IRPrinter(source_file);
+        source_file<<stmt<<endl;
+        irp.print(compute);
+        source_file<<endl;
+
+    }
+
     IndexStmt _prepare(Tensor<float>& A, Tensor<float>& B, Tensor<float>& C) {
         srand(434321);
         for (int i = 0; i < NUM_I; i++) {
@@ -131,6 +148,7 @@ namespace mytest {
         string filename = "sr_eb_test";
         set_CUDA_codegen_enabled(1);
         _printToFile(filename,stmt);
+        _printIRtoFile(filename,stmt);
         ASSERT_EQ(1, 1);
     }
 
