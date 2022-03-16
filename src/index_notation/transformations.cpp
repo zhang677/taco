@@ -1976,7 +1976,7 @@ IndexStmt insertTemporaries(IndexStmt stmt)
                 .bound(ko, dense_val, 4, BoundType::MaxExact)
                 .parallelize(block, ParallelUnit::GPUBlock, OutputRaceStrategy::IgnoreRaces)
                 .parallelize(warp, ParallelUnit::GPUWarp, OutputRaceStrategy::IgnoreRaces)
-                .parallelize(thread, ParallelUnit::GPUThread, OutputRaceStrategy::Atomics);
+                .parallelize(thread, ParallelUnit::GPUThread, OutputRaceStrategy::Atomics);// .mypara(nnz, myattr);
 
         SuchThat tmp_stmt = to<SuchThat>(stmt);
         Forall tmp_for = to<Forall>(tmp_stmt.getStmt());
