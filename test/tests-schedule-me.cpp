@@ -149,6 +149,7 @@ namespace mytest {
         set_CUDA_codegen_enabled(1);
         _printToFile(filename,stmt);
         _printIRtoFile(filename,stmt);
+        cout<<stmt<<endl;
         ASSERT_EQ(1, 1);
     }
 

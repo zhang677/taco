@@ -540,6 +540,12 @@ IndexStmt ForAllReplace::apply(IndexStmt stmt, string* reason) const {
     void visit(const ForallNode* node) {
       Forall foralli(node);
       vector<IndexVar> pattern = transformation.getPattern();
+      /*
+      for (auto p: pattern){
+          std::cout<<p<<" , ";
+      }
+      std::cout<<std::endl;
+       */
       if (elementsMatched == -1) {
         return; // pattern did not match
       }
@@ -1979,6 +1985,10 @@ IndexStmt insertTemporaries(IndexStmt stmt)
                 .parallelize(thread, ParallelUnit::GPUThread, OutputRaceStrategy::Atomics);// .mypara(nnz, myattr);
 
         SuchThat tmp_stmt = to<SuchThat>(stmt);
+        for (auto rel: tmp_stmt.getPredicate()){
+            cout<<rel<<" ; ";
+        }
+        cout<<endl;
         Forall tmp_for = to<Forall>(tmp_stmt.getStmt());
         IndexVar tmp_val = tmp_for.getIndexVar();
         do{

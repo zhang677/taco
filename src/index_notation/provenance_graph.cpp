@@ -1231,6 +1231,12 @@ std::vector<ir::Expr> ProvenanceGraph::deriveIterBounds(IndexVar indexVar, std::
 
   if (isUnderived(indexVar)) {
     taco_iassert(underivedBounds.count(indexVar) == 1);
+    /*
+    std::cout<<"IndexVar: "<<indexVar<<std::endl;
+    for (auto expr : underivedBounds[indexVar]) {
+        std::cout << expr << std::endl;
+    }
+     */
     return underivedBounds[indexVar];
   }
 

@@ -3,6 +3,21 @@
 #include "taco/tensor.h"
 #include "taco/index_notation/index_notation.h"
 
+#include <taco/index_notation/transformations.h>
+#include <codegen/codegen_c.h>
+#include <codegen/codegen_cuda.h>
+#include <fstream>
+#include "test.h"
+#include "test_tensors.h"
+#include "taco/tensor.h"
+#include "taco/index_notation/index_notation.h"
+#include "taco/index_notation/transformations.h"
+#include "codegen/codegen.h"
+#include "taco/lower/lower.h"
+#include "op_factory.h"
+
+
+
 using namespace taco;
 const IndexVar i("i"), j("j"), k("k");
 
@@ -71,8 +86,10 @@ TEST(indexstmt, sequence) {
 
 TEST(indexstmt, spmm) {
   Type t(type<double>(), {3,3});
-  TensorVar A("A", t, Sparse), B("B", t, Sparse), C("C", t, Sparse);
-  TensorVar w("w", Type(type<double>(),{3}), Dense);
+  //TensorVar A("A", t, Sparse), B("B", t, Sparse), C("C", t, Sparse);
+    TensorVar A("A", t, CSR), B("B", t, CSR), C("C", t, CSR);
+
+    TensorVar w("w", Type(type<double>(),{3}), Dense);
 
   auto spmm = forall(i,
                      forall(k,
@@ -81,6 +98,22 @@ TEST(indexstmt, spmm) {
                                   )
                             )
                      );
+  string filename = "SpGEMM";
+
+    stringstream source;
+    string file_path = "eval_generated/";
+    mkdir(file_path.c_str(), 0777);
+    std::shared_ptr<ir::CodeGen> codegen = ir::CodeGen::init_default(source, ir::CodeGen::ImplementationGen);
+    ir::Stmt compute = lower(spmm, "compute",  false, true);
+
+    ofstream source_file;
+    string file_ending=".txt";
+    source_file.open(file_path + filename + file_ending);
+    ir::IRPrinter irp = ir::IRPrinter(source_file);
+    source_file<<spmm<<endl;
+    irp.print(compute);
+    source_file<<endl;
+
 }
 
 
