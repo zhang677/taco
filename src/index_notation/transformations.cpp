@@ -1892,7 +1892,7 @@ IndexStmt insertTemporaries(IndexStmt stmt)
   return stmt;
 }
 
-    IndexStmt BypassOptimizeSpMM(IndexStmt stmt){
+    IndexStmt BypassOptimizeSpMM(IndexStmt stmt, int tag){
 
         // Input: C(i,k) = A(i,j) * B(j,k)
         if (!isa<Forall>(stmt)) {
@@ -1972,18 +1972,32 @@ IndexStmt insertTemporaries(IndexStmt stmt)
         TensorVar tnnz_val("tnnz_val",
                            Type(A.getType().getDataType(),{}),
                            taco::dense);
-        stmt = stmt.reorder({i, j, k})
-                .fuse(i, j, f)
-                .pos(f, fpos, A(i, j))
-                .split(fpos, block, fpos1, 256)
-                .split(fpos1, warp, nnz, 16)
-                .split(k, ko, thread, 32)
-                .reorder({block, warp, thread, ko, nnz})
-                .bound(ko, dense_val, 4, BoundType::MaxExact)
-                .parallelize(block, ParallelUnit::GPUBlock, OutputRaceStrategy::IgnoreRaces)
-                .parallelize(warp, ParallelUnit::GPUWarp, OutputRaceStrategy::IgnoreRaces)
-                .parallelize(thread, ParallelUnit::GPUThread, OutputRaceStrategy::Atomics);// .mypara(nnz, myattr);
+        if (tag==0) {
+            stmt = stmt.reorder({i, j, k})
+                    .fuse(i, j, f)
+                    .pos(f, fpos, A(i, j))
+                    .split(fpos, block, fpos1, 256)
+                    .split(fpos1, warp, nnz, 16)
+                    .split(k, ko, thread, 32)
+                    .reorder({block, warp, thread, ko, nnz})
+                    .bound(ko, dense_val, 4, BoundType::MaxExact)
+                    .parallelize(block, ParallelUnit::GPUBlock, OutputRaceStrategy::IgnoreRaces)
+                    .parallelize(warp, ParallelUnit::GPUWarp, OutputRaceStrategy::IgnoreRaces)
+                    .parallelize(thread, ParallelUnit::GPUThread, OutputRaceStrategy::Atomics);// .mypara(nnz, myattr);
+        }
+        else if (tag==1){
+            stmt = stmt.reorder({i, j, k})
+                    .fuse(i, j, f)
+                    .pos(f, fpos, A(i, j))
+                    .split(fpos, block, fpos1, 256)
+                    .split(fpos1, warp, nnz, 32)
+                    .reorder({block, warp, k, nnz})
+                    .parallelize(block, ParallelUnit::GPUBlock, OutputRaceStrategy::IgnoreRaces)
+                    .parallelize(warp, ParallelUnit::GPUWarp, OutputRaceStrategy::IgnoreRaces)
+                    .parallelize(nnz, ParallelUnit::GPUThread, OutputRaceStrategy::Atomics);// .mypara(nnz, myattr);
+                    return stmt;
 
+        }
         SuchThat tmp_stmt = to<SuchThat>(stmt);
         for (auto rel: tmp_stmt.getPredicate()){
             cout<<rel<<" ; ";
@@ -2058,7 +2072,6 @@ IndexStmt insertTemporaries(IndexStmt stmt)
         };
         HoistWrites hoistWrites(tmp_for,tmp_val,resultAccess,tmp_op);
         return hoistWrites.rewrite(stmt);
-
 
     }
 

@@ -108,9 +108,13 @@ namespace mytest {
     }
 
     IndexStmt SpMM_SR_EB(IndexStmt stmt) {
-        stmt = BypassOptimizeSpMM(stmt);
+        stmt = BypassOptimizeSpMM(stmt,0);
         return stmt;
+    }
 
+    IndexStmt SpMM_SR_EB_N(IndexStmt stmt) {
+        stmt = BypassOptimizeSpMM(stmt, 1);
+        return stmt;
     }
 
     IndexStmt SpMM_PR_RB(IndexStmt stmt, Tensor<float> A) {
@@ -127,6 +131,18 @@ namespace mytest {
                                      .parallelize(ki, ParallelUnit::GPUWarp, OutputRaceStrategy::Atomics) //
                                      .parallelize(jpos1, ParallelUnit::GPUThread,
                                                   OutputRaceStrategy::ParallelReduction));
+    }
+
+    TEST(scheduling_eval, spmm_SR_EB_N) {
+        IndexStmt stmt = _prepare(A,B,C);
+        stmt = SpMM_SR_EB_N(stmt);
+        //stmt = scalarPromote(stmt);
+        string filename = "sr_eb_n_test";
+        set_CUDA_codegen_enabled(1);
+        _printToFile(filename,stmt);
+        _printIRtoFile(filename,stmt);
+        cout<<stmt<<endl;
+        ASSERT_EQ(1, 1);
     }
 
     TEST(scheduling_eval, spmm_SR_RB) {
