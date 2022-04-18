@@ -576,6 +576,7 @@ struct Store : public StmtNode<Store> {
   Expr loc;
   Expr data;
   bool use_atomics;
+  bool use_seg;
   ParallelUnit atomic_parallel_unit;
 
   static Stmt make(Expr arr, Expr loc, Expr data, bool use_atomics=false, ParallelUnit atomic_parallel_unit=ParallelUnit::NotParallel);

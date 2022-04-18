@@ -1986,15 +1986,23 @@ IndexStmt insertTemporaries(IndexStmt stmt)
                     .parallelize(thread, ParallelUnit::GPUThread, OutputRaceStrategy::Atomics);// .mypara(nnz, myattr);
         }
         else if (tag==1){
-            stmt = stmt.reorder({i, j, k})
-                    .fuse(i, j, f)
+            IndexExpr AExpr = A(i,j);
+            IndexExpr BExpr = B(j,k);
+            IndexExpr precomputedExpr = (AExpr) * (BExpr);
+            TensorVar tmpVal("tmpVal",
+                               Type(A.getType().getDataType(),{}));
+            stmt = forall(i,
+                          forall(j,
+                                 forall(k,
+                                        where(C(i,k)+=tmpVal,tmpVal = A(i,j)*B(j,k)))));
+
+            //stmt = stmt.reorder({i, j, k})
+            stmt = stmt.fuse(i, j, f)
                     .pos(f, fpos, A(i, j))
                     .split(fpos, block, fpos1, 256)
-                    .split(fpos1, warp, nnz, 32)
-                    .reorder({block, warp, k, nnz})
+                    .reorder({block, k, fpos1})
                     .parallelize(block, ParallelUnit::GPUBlock, OutputRaceStrategy::IgnoreRaces)
-                    .parallelize(warp, ParallelUnit::GPUWarp, OutputRaceStrategy::IgnoreRaces)
-                    .parallelize(nnz, ParallelUnit::GPUThread, OutputRaceStrategy::Atomics);// .mypara(nnz, myattr);
+                    .parallelize(fpos1, ParallelUnit::GPUThread, OutputRaceStrategy::ParallelReduction);// .mypara(nnz, myattr);
                     return stmt;
 
         }

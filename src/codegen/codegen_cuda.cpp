@@ -1445,7 +1445,7 @@ void CodeGen_CUDA::visit(const Store* op) {
         auto add = to<Add>(op->data);
         taco_iassert(isa<Load>(add->a));
         taco_iassert(to<Load>(add->a)->arr == op->arr && to<Load>(add->a)->loc == op->loc);
-        if (deviceFunctionLoopDepth == 0 || op->atomic_parallel_unit == ParallelUnit::GPUWarp) {
+        if (deviceFunctionLoopDepth == 0 || op->atomic_parallel_unit == ParallelUnit::GPUWarp ) {
           // use atomicAddWarp
           doIndent();
           stream << "atomicAddWarp<" << printCUDAType(add->b.type(), false) << ">(";
@@ -1456,8 +1456,20 @@ void CodeGen_CUDA::visit(const Store* op) {
           add->b.accept(this);
           stream << ");" << endl;
         }
+        else if (deviceFunctionLoopDepth == 0 || op->atomic_parallel_unit == ParallelUnit::GPUWarpScan){
+            // use segReduceWarp
+            doIndent();
+            stream << "segReduceWarp<" << printCUDAType(add->b.type(), false) << ">(";
+            op->arr.accept(this);
+            stream << ", ";
+            op->loc.accept(this);
+            stream << ", ";
+            add->b.accept(this);
+            stream << ");" << endl;
+        }
         else {
           doIndent();
+
           stream << "atomicAdd(&";
 
           op->arr.accept(this);
