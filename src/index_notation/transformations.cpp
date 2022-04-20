@@ -336,7 +336,7 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
       } else {
         a = Assignment(a.getLhs(), a.getRhs());
       }
-      cout<<"Consumer Assignment return: "<<a<<endl;
+      //cout<<"Consumer Assignment return: "<<a<<endl;
       return a;
     }
 
@@ -349,16 +349,16 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
       auto assignment = ws(iw_vars) = replace(e, substitutions);
       if (!assignment.getReductionVars().empty())
         assignment = Assignment(assignment.getLhs(), assignment.getRhs(), Add());
-        cout<<"Producer Assignment return: "<<assignment<<endl;
+        //cout<<"Producer Assignment return: "<<assignment<<endl;
       return assignment;
     }
 
     IndexStmt generateForalls(IndexStmt stmt, vector<IndexVar> indexVars) {
       auto returnStmt = stmt;
-      cout<<"GenerateForalls: "<<endl;
+      //cout<<"GenerateForalls: "<<endl;
       for (auto &i : indexVars) {
         returnStmt = forall(i, returnStmt);
-        cout<<"returnStmt: "<<returnStmt<<endl;
+        //cout<<"returnStmt: "<<returnStmt<<endl;
       }
 
       return returnStmt;
@@ -387,7 +387,7 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
 
     void visit(const ForallNode* node) {
       Forall foralli(node);
-      cout<<"Current Forall: "<<foralli<<endl;
+      //cout<<"Current Forall: "<<foralli<<endl;
       std::vector<IndexVar> i_vars = precompute.getIVars();
 
       bool containsWhere = false;
@@ -419,8 +419,8 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
 
         // Build consumer by replacing with temporary (in replacedStmt)
         IndexStmt replacedStmt = replace(s, {{e, ws(i_vars) }});
-        cout<<"replacedStmt: "<<replacedStmt<<endl;
-        cout<<"currentStmt: "<<s<<endl;
+        //cout<<"replacedStmt: "<<replacedStmt<<endl;
+        //cout<<"currentStmt: "<<s<<endl;
         if (replacedStmt != s) {
           // Then modify the replacedStmt to have the correct foralls
           // by concretizing the consumer assignment
@@ -429,7 +429,10 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
           auto consumerIndexVars = consumerAssignment.getIndexVars();
 
           auto producerAssignment = getProducerAssignment(ws, i_vars, iw_vars, e, substitutions);
+          /// GENGHAN: Originally producerIndexVars include IndexVars if the rhs
           auto producerIndexVars = producerAssignment.getIndexVars();
+          //auto producerIndexVars = producerAssignment.getLhs().getIndexVars();
+          //cout<<"producerAssignment: "<<producerAssignment<<endl;
 
           vector<IndexVar> producerForallIndexVars;
           vector<IndexVar> consumerForallIndexVars;
@@ -451,21 +454,27 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
               } else if (!stopForallDistribution && producerContains) {
                 producerForallIndexVars.push_back(i);
               }
+              /// GENGHAN: If current IndexVar is not in producer or consumer
+              //else {
+              //    outerForallIndexVars.push_back(i);
+              //}
             }
           }
-          cout<<"consumerIndexVars: "<<consumerIndexVars<<endl;
-          cout<<"producerIndexVars: "<<producerIndexVars<<endl;
-          cout<<"forallIndexVars: "<<forallIndexVars<<endl;
+          //cout<<"consumerIndexVars: "<<consumerIndexVars<<endl;
+          //cout<<"producerIndexVars: "<<producerIndexVars<<endl;
+          //cout<<"forallIndexVars: "<<forallIndexVars<<endl;
           /// GENGHAN: Hack Begins. Use this and `i1tmp("i1")`
           /// to generate forall(i0, where(forall(i1, A() += ws(i1)), forall(i1, ws(i1) += B(i) * C(i))))
           /// If `i1tmp("i1tmp")` it will fail
+          /*
           outerForallIndexVars.clear();
           consumerForallIndexVars.clear();
           producerForallIndexVars.clear();
           cout<<forallIndexVars[0]<<","<<forallIndexVars[1]<<endl;
-          outerForallIndexVars.push_back(forallIndexVars[0]);
-          consumerForallIndexVars.push_back(consumerIndexVars[0]);
-          producerForallIndexVars.push_back(producerIndexVars[0]);
+          outerForallIndexVars.push_back(forallIndexVars[0]); // i0
+          consumerForallIndexVars.push_back(consumerIndexVars[0]); // i1
+          producerForallIndexVars.push_back(producerIndexVars[0]); // i1tmp
+          */
           /// GENGHAN: Hack Ends
           IndexStmt consumer = generateForalls(consumerAssignment, consumerForallIndexVars);
 
@@ -484,9 +493,9 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
   rewriter.precompute = *this;
   rewriter.provGraph = provGraph;
   rewriter.forallIndexVarList = forallIndexVars;
-  cout<<"Init Stmt:"<<stmt<<endl;
+  //cout<<"Init Stmt:"<<stmt<<endl;
   stmt = rewriter.rewrite(stmt);
-  cout<<"Final Stmt:"<<stmt<<endl;
+  //cout<<"Final Stmt:"<<stmt<<endl;
 
   return stmt;
 }
