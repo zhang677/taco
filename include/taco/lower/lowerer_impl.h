@@ -122,7 +122,7 @@ protected:
   virtual ir::Expr lowerIndexVar(IndexVar indexVar) = 0;
 
   /// Lower a concrete index variable statement.
-  virtual ir::Stmt lower(IndexStmt stmt);
+  virtual ir::Stmt lower(IndexStmt stmt, std::string str = __builtin_FUNCTION());
 
   /// Lower a concrete index variable expression.
   virtual ir::Expr lower(IndexExpr expr);

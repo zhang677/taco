@@ -1989,7 +1989,7 @@ IndexStmt insertTemporaries(IndexStmt stmt)
             IndexExpr AExpr = A(i,j);
             IndexExpr BExpr = B(j,k);
             IndexExpr precomputedExpr = (AExpr) * (BExpr);
-            TensorVar tmpVal("tmpVal",
+            TensorVar tmpVal("tmp",
                                Type(A.getType().getDataType(),{}));
             stmt = forall(i,
                           forall(j,
@@ -2002,7 +2002,7 @@ IndexStmt insertTemporaries(IndexStmt stmt)
                     .split(fpos, block, fpos1, 256)
                     .reorder({block, k, fpos1})
                     .parallelize(block, ParallelUnit::GPUBlock, OutputRaceStrategy::IgnoreRaces)
-                    .parallelize(fpos1, ParallelUnit::GPUThread, OutputRaceStrategy::ParallelReduction);// .mypara(nnz, myattr);
+                    .parallelize(fpos1, ParallelUnit::GPUThread, OutputRaceStrategy::Atomics);// .mypara(nnz, myattr);
                     return stmt;
 
         }

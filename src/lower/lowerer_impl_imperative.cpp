@@ -601,7 +601,8 @@ Stmt LowererImplImperative::lowerAssignment(Assignment assignment)
     computeStmt = IfThenElse::make(ir::Neg::make(readBitGuard),
                                    firstWriteAtIndex, computeStmt);
   }
-
+    //cout<<"lowerAssignment return : "<<(assembleGuardTrivial ? computeStmt : IfThenElse::make(assembleGuard,
+    //                                                                                         computeStmt))<<endl;
   return assembleGuardTrivial ? computeStmt : IfThenElse::make(assembleGuard,
                                                                computeStmt);
 }
@@ -657,7 +658,8 @@ Stmt LowererImplImperative::lowerForall(Forall forall)
   if (forall.getParallelUnit() != ParallelUnit::NotParallel) {
     inParallelLoopDepth++;
   }
-  cout<<"IndexVar->Expr"<<endl;
+
+  cout<<"IndexVar->Expr : ";
   for (auto& i: indexVarToExprMap){
       cout<<i.first<<": "<<i.second<<" ; ";
   }
@@ -674,7 +676,7 @@ Stmt LowererImplImperative::lowerForall(Forall forall)
       IndexVar posVar = provGraph.getChildren(varToRecover)[0];
       std::vector<ir::Expr> iterBounds = provGraph.deriveIterBounds(posVar, definedIndexVarsOrdered, underivedBounds, indexVarToExprMap, iterators);
 
-      std::cout<<"IndexVar: "<<varToRecover<<std::endl;
+      std::cout<<"IndexVar: "<<varToRecover<<" : ";
         for (auto expr : iterBounds) {
             std::cout << expr << "," ;
         }
@@ -691,7 +693,7 @@ Stmt LowererImplImperative::lowerForall(Forall forall)
 
     Expr recoveredValue = provGraph.recoverVariable(varToRecover, definedIndexVarsOrdered, underivedBounds, indexVarToExprMap, iterators);
     taco_iassert(indexVarToExprMap.count(varToRecover));
-    std::cout<<"RecoverVar: "<<varToRecover<<std::endl;
+    std::cout<<"RecoverVar: "<<varToRecover<<" : ";
     std::cout<<recoveredValue<<std::endl;
     recoverySteps.push_back(VarDecl::make(indexVarToExprMap[varToRecover], recoveredValue));
 
@@ -715,7 +717,6 @@ Stmt LowererImplImperative::lowerForall(Forall forall)
         std::cout<<iter<<" , ";
     }
     std::cout<<endl;
-    cout<<endl;
     recoverySteps.push_back(this->declLocatePosVars(itersForVar));
 
     // place underived guard
@@ -775,6 +776,11 @@ Stmt LowererImplImperative::lowerForall(Forall forall)
       recoverySteps.push_back(IfThenElse::make(guard, ir::Continue::make()));
     }
   }
+  cout<<"recoverySteps: ";
+  for(auto &i : recoverySteps){
+      cout<<i<<"||";
+  }
+  cout<<endl;
   Stmt recoveryStmt = Block::make(recoverySteps);
 
   //[GENGHAN] After the recovery, the IndexVar has been defined
@@ -801,6 +807,7 @@ Stmt LowererImplImperative::lowerForall(Forall forall)
   // loops index variable
   Stmt preInitValues = initResultArrays(forall.getIndexVar(), resultAccesses,
                                         reducedAccesses);
+  //cout<<"preInitValues: "<<preInitValues<<endl;
     // [GENGHAN]: Do an implicit where
   // Emit temporary initialization if forall is sequential or parallelized by
   // cpu threads and leads to a where statement
@@ -818,7 +825,7 @@ Stmt LowererImplImperative::lowerForall(Forall forall)
   Stmt loops;
   // Emit a loop that iterates over a single iterator (optimization)
   cout<<"Lattice: "<<caseLattice<<endl;
-  cout<<"TensorVar: "<<endl;
+  cout<<"TensorVar: ";
   for (auto& i : tensorVars){
       cout<<i.first<<"->"<<i.second<<" , ";
   }
@@ -892,23 +899,26 @@ Stmt LowererImplImperative::lowerForall(Forall forall)
       for(auto& i : reducedAccesses){
           cout<<i<<" ; ";
       }
-      cout<<"RecoveryStmt: "<<endl;
+      cout<<"RecoveryStmt: ";
       cout<<recoveryStmt<<endl;
     if (!isWhereProducer && hasPosDescendant && underivedAncestors.size() > 1 && provGraph.isPosVariable(iterator.getIndexVar()) && posDescendant == forall.getIndexVar()) {
+        cout<<"Into lowerFuse"<<endl;
       loops = lowerForallFusedPosition(forall, iterator, locators, inserters, appenders, caseLattice,
                                        reducedAccesses, recoveryStmt);
     }
     else if (canAccelWithSparseIteration) {
+        cout<<"Into lowerdense"<<endl;
       loops = lowerForallDenseAcceleration(forall, locators, inserters, appenders, caseLattice, reducedAccesses, recoveryStmt);
     }
     // Emit dimension coordinate iteration loop
     else if (iterator.isDimensionIterator()) {
-
+        cout<<"Into lowerForallDimension"<<endl;
       loops = lowerForallDimension(forall, point.locators(), inserters, appenders, caseLattice,
                                    reducedAccesses, recoveryStmt);
     }
     // Emit position iteration loop
     else if (iterator.hasPosIter()) {
+        cout<<"Into lowerForallPosition"<<endl;
       loops = lowerForallPosition(forall, iterator, locators, inserters, appenders, caseLattice,
                                   reducedAccesses, recoveryStmt);
     }
@@ -921,6 +931,7 @@ Stmt LowererImplImperative::lowerForall(Forall forall)
   }
   // Emit general loops to merge multiple iterators
   else {
+      cout<<"Into lowerMergeLattice"<<endl;
     std::vector<IndexVar> underivedAncestors = provGraph.getUnderivedAncestors(forall.getIndexVar());
     taco_iassert(underivedAncestors.size() == 1); // TODO: add support for fused coordinate of pos loop
     loops = lowerMergeLattice(caseLattice, underivedAncestors[0],
@@ -933,8 +944,8 @@ Stmt LowererImplImperative::lowerForall(Forall forall)
     // omitted.
     loops = Stmt();
   }
-  cout<<"Loops: "<<endl;
-  cout<<loops<<endl;
+  //cout<<"Loops: "<<endl;
+  //cout<<loops<<endl;
   definedIndexVars.erase(forall.getIndexVar());
   definedIndexVarsOrdered.pop_back();
   if (forall.getParallelUnit() != ParallelUnit::NotParallel) {
@@ -1279,7 +1290,6 @@ Stmt LowererImplImperative::lowerForallDimension(Forall forall,
             && forall.getOutputRaceStrategy() != OutputRaceStrategy::ParallelReduction && !ignoreVectorize) {
     kind = LoopKind::Runtime;
   }
-
   return Block::blanks(For::make(coordinate, bounds[0], bounds[1], 1, body,
                                  kind,
                                  ignoreVectorize ? ParallelUnit::NotParallel : forall.getParallelUnit(), ignoreVectorize ? 0 : forall.getUnrollFactor()),
@@ -2076,6 +2086,7 @@ Stmt LowererImplImperative::lowerForallBody(Expr coordinate, IndexStmt stmt,
                                   const set<Access>& reducedAccesses) {
 
   // Inserter positions
+
   Stmt declInserterPosVars = declLocatePosVars(inserters);
 
   // Locate positions
@@ -2584,6 +2595,8 @@ Stmt LowererImplImperative::lowerWhere(Where where) {
   whereConsumers.pop_back();
   whereTemps.pop_back();
   whereTempsToResult.erase(where.getTemporary());
+  //cout<<"lowerWhere return : ";
+  //cout<<Block::make(initializeTemporary, producer, markAssignsAtomicDepth > 0 ? capturedLocatePos : ir::Stmt(), consumer,  freeTemporary)<<endl;
   return Block::make(initializeTemporary, producer, markAssignsAtomicDepth > 0 ? capturedLocatePos : ir::Stmt(), consumer,  freeTemporary);
 }
 
@@ -2917,8 +2930,15 @@ Expr LowererImplImperative::lowerTensorOp(Call op) {
   return op.getFunc()(args);
 }
 
-Stmt LowererImplImperative::lower(IndexStmt stmt) {
-  return visitor->lower(stmt);
+Stmt LowererImplImperative::lower(IndexStmt stmt, std::string name) {
+    cout<<"——————————————————————————————————————————————————————————"<<endl;
+    cout<<"Called by : "<<name<<endl;
+    cout<<"Stmt: "<<stmt<<endl;
+    Stmt tmp = visitor->lower(stmt);
+    cout<<"Return: "<<tmp;
+  //return visitor->lower(stmt);
+    cout<<"----------------------------------------------------------"<<endl;
+    return tmp;
 }
 
 

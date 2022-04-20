@@ -133,6 +133,80 @@ namespace mytest {
                                                   OutputRaceStrategy::ParallelReduction));
     }
 
+    IndexStmt scheduleSpGEMMCPU(IndexStmt stmt, bool doPrecompute) {
+        Assignment assign = stmt.as<Forall>().getStmt().as<Forall>().getStmt()
+                .as<Forall>().getStmt().as<Assignment>();
+        TensorVar result = assign.getLhs().getTensorVar();
+
+        stmt = reorderLoopsTopologically(stmt);
+        if (doPrecompute) {
+            IndexVar j = assign.getLhs().getIndexVars()[1];
+            TensorVar w("w", Type(result.getType().getDataType(),
+                                  {result.getType().getShape().getDimension(1)}), taco::dense);
+            stmt = stmt.precompute(assign.getRhs(), j, j, w);
+        }
+        stmt = stmt.assemble(result, AssembleStrategy::Insert, true);
+        auto qi_stmt = stmt.as<Assemble>().getQueries();
+        IndexVar qi;
+        if (isa<Where>(qi_stmt)) {
+            qi = qi_stmt.as<Where>().getConsumer().as<Forall>().getIndexVar();
+        } else {
+            qi = qi_stmt.as<Forall>().getIndexVar();
+        }
+        stmt = stmt.parallelize(i, ParallelUnit::CPUThread,
+                                OutputRaceStrategy::NoRaces)
+                .parallelize(qi, ParallelUnit::CPUThread,
+                             OutputRaceStrategy::NoRaces);
+
+        return stmt;
+    }
+
+    IndexStmt prepareSpGEMM(Format aFormat, Format bFormat, bool doPrecompute){
+        int NUM_I = 100;
+        int NUM_J = 100;
+        int NUM_K = 100;
+        float SPARSITY = .03;
+        Tensor<double> A("A", {NUM_I, NUM_J}, aFormat);
+        Tensor<double> B("B", {NUM_J, NUM_K}, bFormat);
+        Tensor<double> C("C", {NUM_I, NUM_K}, CSR);
+
+        srand(75883);
+        for (int i = 0; i < NUM_I; i++) {
+            for (int j = 0; j < NUM_J; j++) {
+                float rand_float = (float)rand()/(float)(RAND_MAX);
+                if (rand_float < SPARSITY) {
+                    A.insert({i, j}, (double) ((int) (rand_float*3/SPARSITY)));
+                }
+            }
+        }
+
+        for (int j = 0; j < NUM_J; j++) {
+            for (int k = 0; k < NUM_K; k++) {
+                float rand_float = (float)rand()/(float)(RAND_MAX);
+                if (rand_float < SPARSITY) {
+                    B.insert({j, k}, (double) ((int) (rand_float*3/SPARSITY)));
+                }
+            }
+        }
+
+        A.pack();
+        B.pack();
+
+        C(i, k) = A(i, j) * B(j, k);
+        IndexStmt stmt = C.getAssignment().concretize();
+        return scheduleSpGEMMCPU(stmt, doPrecompute);
+    }
+
+    TEST(scheduling_eval, SpGEMM) {
+        IndexStmt stmt = prepareSpGEMM(DCSR, CSR, true);
+        string filename = "spgemm_test";
+        set_CUDA_codegen_enabled(0);
+        _printToFile(filename,stmt);
+        _printIRtoFile(filename,stmt);
+        cout<<stmt<<endl;
+        ASSERT_EQ(1, 1);
+    }
+
     TEST(scheduling_eval, spmm_SR_EB_N) {
         IndexStmt stmt = _prepare(A,B,C);
         stmt = SpMM_SR_EB_N(stmt);

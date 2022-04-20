@@ -240,7 +240,7 @@ protected:
   virtual ir::Expr lowerTensorOp(Call op);
 
   /// Lower a concrete index variable statement.
-  ir::Stmt lower(IndexStmt stmt);
+  ir::Stmt lower(IndexStmt stmt, std::string str = __builtin_FUNCTION());
 
   /// Lower a concrete index variable expression.
   ir::Expr lower(IndexExpr expr);
