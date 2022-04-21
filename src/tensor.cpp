@@ -795,9 +795,13 @@ vector<void*> packArguments(const TensorBase& tensor) {
 
   // Pack operand tensors
   auto operands = getArguments(makeConcreteNotation(tensor.getAssignment()));
-
+    //cout<<tensor.getAssignment().getRhs()<<endl;
   auto tensors = getTensors(tensor.getAssignment().getRhs());
+  //for(auto& t : tensors){
+  //    cout<<t.first<<" , "<<t.second<<endl;
+  //}
   for (auto& operand : operands) {
+      //cout<<operand<<endl;
     taco_iassert(util::contains(tensors, operand));
     arguments.push_back(tensors.at(operand).getStorage());
   }

@@ -230,6 +230,8 @@ namespace Temptest {
     }
 
     TEST(workspaces, precompute2D_add) {
+        /// GENGHAN: Target is forall(i, forall(j, A(i,j) = D(i,j))
+
         int N = 16;
         Tensor<double> A("A", {N, N}, Format{Dense, Dense});
         Tensor<double> B("B", {N, N}, Format{Dense, Dense});
@@ -247,14 +249,53 @@ namespace Temptest {
         IndexVar i("i"), j("j");
         IndexExpr precomputedExpr = B(i, j) + C(i, j);
         A(i, j) = precomputedExpr + D(i, j);
+        TensorVar ws1("ws1", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
+        TensorVar ws2("ws2", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
 
-        IndexStmt stmt = A.getAssignment().concretize();
-        TensorVar ws("ws", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
-        stmt = stmt.precompute(precomputedExpr, {i, j}, {i, j}, ws);
+        //IndexStmt stmt = A.getAssignment().concretize();
+        //stmt = stmt.precompute(precomputedExpr, {i, j}, {i, j}, ws1);
+        //stmt = stmt.precompute(ws1(i,j)+D(i,j), {i, j}, {i, j}, ws2);
+
+
+        TensorVar Av("A", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
+        TensorVar Bv("B", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
+        TensorVar Cv("C", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
+        TensorVar Dv("D", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
+
+        /// FIXME: The expression (ws1(i,j) + D(i,j)) is not in forall(i, forall(j, A(i,j) = B(i,j) + C(i,j) + D(i,j)))
+        IndexStmt stmt = forall(i,
+                                forall(j,
+                                       Av(i,j) = (Bv(i,j)+Cv(i,j))+Dv(i,j)));
+        stmt = stmt.precompute(Bv(i,j)+Cv(i,j), {i, j}, {i, j}, ws1);
+        stmt = stmt.precompute(ws1(i,j)+Dv(i,j), {i, j}, {i, j}, ws2);
+
+        /// How to generate correct foralls before consumer
+        IndexStmt stmt0= where(forall(i,
+                            forall(j,
+                                   Av(i,j)=ws2(i,j))),
+                     where(
+                             forall(i,
+                                    forall(j,
+                                           ws2(i,j) = ws1(i,j) + Dv(i,j))),
+                             forall(i,
+                                    forall(j,
+                                           ws1(i,j) = Bv(i,j) + Cv(i,j)))));
+        /// If S2 modifies its tensor with an assignment statement, then (Any S1) where (Any S2) is equivalent with Any(S1 where S2)
+        /// FIXME: use of undeclared identifier 'jws1'
+        IndexStmt stmt1= where(forall(i,
+                                      forall(j,
+                                             Av(i,j)=ws2(i,j))),
+                                       forall(i,
+                                              forall(j,
+                                                     where(
+                                                     ws2(i,j) = ws1(i,j) + Dv(i,j),
+                                                     ws1(i,j) = Bv(i,j) + Cv(i,j)))));
 
         A.compile(stmt.concretize());
         A.assemble();
         A.compute();
+
+
 
         Tensor<double> expected("expected", {N, N}, Format{Dense, Dense});
         expected(i, j) = B(i, j) + C(i, j) + D(i, j);
@@ -264,6 +305,10 @@ namespace Temptest {
         ASSERT_TENSOR_EQ(expected, A);
         _printToCout(stmt);
 
+    }
+
+    TEST(workspaces, failed_scalarTemp){
+        /// TODO: precompute SpMM
     }
 
     TEST(workspaces, precompute4D_add) {
@@ -286,8 +331,10 @@ namespace Temptest {
         }
 
         IndexVar i("i"), j("j"), k("k"), l("l");
+        IndexVar iw("iw"), jw("jw"), kw("kw"), lw("lw");
         IndexExpr precomputedExpr = B(i, j, k, l) + C(i, j, k, l);
-        A(i, j, k, l) = precomputedExpr + D(i, j, k, l);
+        IndexExpr pprecomputedExpr = precomputedExpr + D(i, j, k, l);
+        A(i, j, k, l) = pprecomputedExpr;
 
 
         IndexStmt stmt = A.getAssignment().concretize();
@@ -298,7 +345,7 @@ namespace Temptest {
 
 
         stmt = stmt.precompute(precomputedExpr, {i, j, k, l}, {i, j, k, l}, ws1)
-                .precompute(ws1(i, j, k, l) + D(i, j, k, l), {i, j, k, l}, {i, j, k, l}, ws2);
+                .precompute(ws1(i, j, k, l) + D(i, j, k, l), {i, j, k, l}, {iw, jw, kw, lw}, ws2);
 
         A.compile(stmt.concretize());
         A.assemble();

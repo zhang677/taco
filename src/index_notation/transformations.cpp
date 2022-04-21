@@ -292,6 +292,7 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
 
   // Precondition: The expr to precompute is not in `stmt`
   Assignment assignment = getAssignmentContainingExpr(stmt, getExpr());
+  cout<<"Assignment: "<<assignment<<endl;
   if (!assignment.defined()) {
     *reason = "The expression (" + util::toString(getExpr()) + ") " +
               "is not in " + util::toString(stmt);
@@ -389,6 +390,7 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
       Forall foralli(node);
       cout<<"Current Forall: "<<foralli<<endl;
       std::vector<IndexVar> i_vars = precompute.getIVars();
+      cout<<"forallIndexVarList: "<<forallIndexVarList<<endl;
 
       bool containsWhere = false;
       match(foralli,
@@ -459,6 +461,7 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
           /// GENGHAN: Hack Begins. Use this and `i1tmp("i1")`
           /// to generate forall(i0, where(forall(i1, A() += ws(i1)), forall(i1, ws(i1) += B(i) * C(i))))
           /// If `i1tmp("i1tmp")` it will fail
+          /*
           outerForallIndexVars.clear();
           consumerForallIndexVars.clear();
           producerForallIndexVars.clear();
@@ -466,6 +469,7 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
           outerForallIndexVars.push_back(forallIndexVars[0]);
           consumerForallIndexVars.push_back(consumerIndexVars[0]);
           producerForallIndexVars.push_back(producerIndexVars[0]);
+           */
           /// GENGHAN: Hack Ends
           IndexStmt consumer = generateForalls(consumerAssignment, consumerForallIndexVars);
 
@@ -476,6 +480,7 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
           return;
         }
       }
+
       IndexNotationRewriter::visit(node);
     }
   };
@@ -485,6 +490,7 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
   rewriter.provGraph = provGraph;
   rewriter.forallIndexVarList = forallIndexVars;
   cout<<"Init Stmt:"<<stmt<<endl;
+  cout<<"WorkSpace: "<<rewriter.precompute.getWorkspace()<<endl;
   stmt = rewriter.rewrite(stmt);
   cout<<"Final Stmt:"<<stmt<<endl;
 
