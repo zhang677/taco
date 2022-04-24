@@ -388,7 +388,7 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
 
     void visit(const ForallNode* node) {
       Forall foralli(node);
-      //cout<<"Current Forall: "<<foralli<<endl;
+      cout<<"Current Forall: "<<foralli<<endl;
       std::vector<IndexVar> i_vars = precompute.getIVars();
       cout<<"forallIndexVarList: "<<forallIndexVarList<<endl;
 
@@ -420,9 +420,11 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
         }
 
         // Build consumer by replacing with temporary (in replacedStmt)
+        cout<<"replaceExpr: "<<e<<endl;
+        cout<<"replaceTemp: "<<ws(i_vars)<<endl;
         IndexStmt replacedStmt = replace(s, {{e, ws(i_vars) }});
-        //cout<<"replacedStmt: "<<replacedStmt<<endl;
-        //cout<<"currentStmt: "<<s<<endl;
+        cout<<"replacedStmt: "<<replacedStmt<<endl;
+        cout<<"currentStmt: "<<s<<endl;
         if (replacedStmt != s) {
           // Then modify the replacedStmt to have the correct foralls
           // by concretizing the consumer assignment
@@ -496,9 +498,9 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
   rewriter.precompute = *this;
   rewriter.provGraph = provGraph;
   rewriter.forallIndexVarList = forallIndexVars;
-  //cout<<"Init Stmt:"<<stmt<<endl;
+  cout<<"Init Stmt:"<<stmt<<endl;
   stmt = rewriter.rewrite(stmt);
-  //cout<<"Final Stmt:"<<stmt<<endl;
+  cout<<"Final Stmt:"<<stmt<<endl;
 
   return stmt;
 }

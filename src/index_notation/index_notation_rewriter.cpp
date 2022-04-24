@@ -63,8 +63,12 @@ void IndexNotationRewriter::visit(const LiteralNode* op) {
 
 template <class T>
 IndexExpr visitBinaryOp(const T *op, IndexNotationRewriter *rw) {
+  cout<<"Old op1: "<<op->a<<endl;
+  cout<<"Old op2: "<<op->b<<endl;
   IndexExpr a = rw->rewrite(op->a);
   IndexExpr b = rw->rewrite(op->b);
+    cout<<"New op1: "<<a<<endl;
+    cout<<"New op2: "<<b<<endl;
   if (a == op->a && b == op->b) {
     return op;
   }
@@ -249,7 +253,13 @@ void IndexNotationRewriter::visit(const SuchThatNode* op) {
 #define SUBSTITUTE_EXPR                        \
 do {                                           \
   IndexExpr e = op;                            \
+  cout<<"exprSubstitutions: ";                  \
+  for (auto& i: exprSubstitutions){            \
+    cout<<i.first<<" , "<<i.second<<endl;                \
+  }                                             \
+  cout<<"e: "<<e<<endl;                                 \
   if (util::contains(exprSubstitutions, e)) {  \
+    cout<<"Detect! "<<endl;                                           \
     expr = exprSubstitutions.at(e);            \
   }                                            \
   else {                                       \
@@ -300,6 +310,7 @@ struct ReplaceRewriter : public IndexNotationRewriter {
   }
 
   void visit(const AddNode* op) {
+
     SUBSTITUTE_EXPR;
   }
 
