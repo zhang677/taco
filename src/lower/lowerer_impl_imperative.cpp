@@ -1576,13 +1576,13 @@ Stmt LowererImplImperative::lowerForallFusedPosition(Forall forall, Iterator ite
 
   Stmt body = lowerForallBody(coordinate, forall.getStmt(),
                               locators, inserters, appenders, caseLattice, reducedAccesses);
-
+    cout<<"Body: "<<body<<endl;
   if (forall.getParallelUnit() != ParallelUnit::NotParallel && forall.getOutputRaceStrategy() == OutputRaceStrategy::Atomics) {
     markAssignsAtomicDepth--;
   }
 
   body = Block::make(recoveryStmt, Block::make(loopsToTrackUnderived), body);
-
+    cout<<"Body: "<<body<<endl;
   // Code to write results if using temporary and reset temporary
   if (!whereConsumers.empty() && whereConsumers.back().defined()) {
     Expr temp = tensorVars.find(whereTemps.back())->second;
@@ -1631,6 +1631,13 @@ Stmt LowererImplImperative::lowerForallFusedPosition(Forall forall, Iterator ite
     kind = LoopKind::Runtime;
   }
   // Loop with preamble and postamble
+  cout<<"boundsCompute: "<<boundsCompute<<endl;
+  cout<<"SearchStart: "<<Block::make(Block::make(searchForUnderivedStart))<<endl;
+  cout<<"declareCoordinate: "<<declareCoordinate<<endl;
+  cout<<"Body: "<<body<<endl;
+  cout<<"posAppend: "<<posAppend<<endl;
+
+
   return Block::blanks(boundsCompute,
                        Block::make(Block::make(searchForUnderivedStart),
                        For::make(indexVarToExprMap[iterator.getIndexVar()], startBound, endBound, 1,
@@ -2935,7 +2942,7 @@ Stmt LowererImplImperative::lower(IndexStmt stmt, std::string name) {
     cout<<"Called by : "<<name<<endl;
     cout<<"Stmt: "<<stmt<<endl;
     Stmt tmp = visitor->lower(stmt);
-    cout<<"Return: "<<tmp;
+    cout<<" Return: "<<tmp;
   //return visitor->lower(stmt);
     cout<<"----------------------------------------------------------"<<endl;
     return tmp;
