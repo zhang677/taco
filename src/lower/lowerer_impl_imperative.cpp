@@ -19,6 +19,10 @@
 #include "taco/util/env.h"
 #include "taco/ir/workspace_rewriter.h"
 
+#define ZOUT(s) if(ZTest) {cout<<#s<<": "<<s;}
+#define ZNDL if(ZTest) {cout<<endl;}
+
+
 using namespace std;
 using namespace taco::ir;
 using taco::util::combine;
@@ -668,6 +672,7 @@ Stmt LowererImplImperative::lowerForall(Forall forall)
   vector<Stmt> recoverySteps;
   std::cout<<"Current Forall Node: ";
   std::cout<<forall<<std::endl;
+  vector<Stmt> recoveryWOguard;
   for (const IndexVar& varToRecover : provGraph.newlyRecoverableParents(forall.getIndexVar(), definedIndexVars)) {
     // place pos guard
     if (forallNeedsUnderivedGuards && provGraph.isCoordVariable(varToRecover) &&
@@ -689,14 +694,17 @@ Stmt LowererImplImperative::lowerForall(Forall forall)
       }
       ir::Stmt guard = ir::IfThenElse::make(guardCondition, ir::Continue::make());
       recoverySteps.push_back(guard);
+      /// Now assume only one varToRecover
+        tmpCondition=guardCondition;
     }
 
     Expr recoveredValue = provGraph.recoverVariable(varToRecover, definedIndexVarsOrdered, underivedBounds, indexVarToExprMap, iterators);
     taco_iassert(indexVarToExprMap.count(varToRecover));
     std::cout<<"RecoverVar: "<<varToRecover<<" : ";
     std::cout<<recoveredValue<<std::endl;
-    recoverySteps.push_back(VarDecl::make(indexVarToExprMap[varToRecover], recoveredValue));
 
+    recoverySteps.push_back(VarDecl::make(indexVarToExprMap[varToRecover], recoveredValue));
+    recoveryWOguard.push_back(VarDecl::make(indexVarToExprMap[varToRecover], recoveredValue));
     // After we've recovered this index variable, some iterators are now
     // accessible for use when declaring locator access variables. So, generate
     // the accessors for those locator variables as part of the recovery process.
@@ -718,7 +726,7 @@ Stmt LowererImplImperative::lowerForall(Forall forall)
     }
     std::cout<<endl;
     recoverySteps.push_back(this->declLocatePosVars(itersForVar));
-
+    recoveryWOguard.push_back(this->declLocatePosVars(itersForVar));
     // place underived guard
     std::vector<ir::Expr> iterBounds = provGraph.deriveIterBounds(varToRecover, definedIndexVarsOrdered, underivedBounds, indexVarToExprMap, iterators);
     if (forallNeedsUnderivedGuards && underivedBounds.count(varToRecover) &&
@@ -747,6 +755,7 @@ Stmt LowererImplImperative::lowerForall(Forall forall)
         Stmt guard = IfThenElse::make(Gte::make(indexVarToExprMap[varToRecover], 
                                       underivedBounds[varToRecover][1]),
                                       Continue::make());
+
         recoverySteps.push_back(guard);
       }
     }
@@ -774,6 +783,7 @@ Stmt LowererImplImperative::lowerForall(Forall forall)
       // for iteration f, f should be within f1 * dimLen and (f1 + 1) * dimLen.
       auto guard = ir::Gte::make(this->indexVarToExprMap[varToRecover], ir::Mul::make(ir::Add::make(this->indexVarToExprMap[outer], 1), dimLen));
       recoverySteps.push_back(IfThenElse::make(guard, ir::Continue::make()));
+
     }
   }
   cout<<"recoverySteps: ";
@@ -782,6 +792,7 @@ Stmt LowererImplImperative::lowerForall(Forall forall)
   }
   cout<<endl;
   Stmt recoveryStmt = Block::make(recoverySteps);
+  tmprecoveryWOguard = Block::make(recoveryWOguard);
 
   //[GENGHAN] After the recovery, the IndexVar has been defined
 
@@ -1576,7 +1587,8 @@ Stmt LowererImplImperative::lowerForallFusedPosition(Forall forall, Iterator ite
 
   Stmt body = lowerForallBody(coordinate, forall.getStmt(),
                               locators, inserters, appenders, caseLattice, reducedAccesses);
-    cout<<"Body: "<<body<<endl;
+
+  cout<<"Body: "<<body<<endl;
   if (forall.getParallelUnit() != ParallelUnit::NotParallel && forall.getOutputRaceStrategy() == OutputRaceStrategy::Atomics) {
     markAssignsAtomicDepth--;
   }
@@ -1588,6 +1600,7 @@ Stmt LowererImplImperative::lowerForallFusedPosition(Forall forall, Iterator ite
     Expr temp = tensorVars.find(whereTemps.back())->second;
     Stmt writeResults = Block::make(whereConsumers.back(), ir::Assign::make(temp, ir::Literal::zero(temp.type())));
     body = Block::make(body, IfThenElse::make(writeResultCond, writeResults));
+      cout<<"Temp Body: "<<body<<endl;
   }
 
   // Code to append positions
@@ -1631,12 +1644,29 @@ Stmt LowererImplImperative::lowerForallFusedPosition(Forall forall, Iterator ite
     kind = LoopKind::Runtime;
   }
   // Loop with preamble and postamble
-  cout<<"boundsCompute: "<<boundsCompute<<endl;
-  cout<<"SearchStart: "<<Block::make(Block::make(searchForUnderivedStart))<<endl;
-  cout<<"declareCoordinate: "<<declareCoordinate<<endl;
-  cout<<"Body: "<<body<<endl;
-  cout<<"posAppend: "<<posAppend<<endl;
+  //cout<<"boundsCompute: "<<boundsCompute<<endl;
+  //cout<<"SearchStart: "<<Block::make(Block::make(searchForUnderivedStart))<<endl;
+  //cout<<"declareCoordinate: "<<declareCoordinate<<endl;
+  //cout<<"Body: "<<body<<endl;
+  //cout<<"posAppend: "<<posAppend<<endl;
+  ZOUT(tmpInitializeTemporary)ZNDL
+  ZOUT(tmpCondition)ZNDL
+    ZOUT(tmpCornerZero)ZNDL
+    ZOUT(tmprecoveryWOguard)ZNDL
+    ZOUT(tmpProducer)ZNDL
+    ZOUT(tmpdeclInserterPosVars)ZNDL
+    ZOUT(tmpConsumer)ZNDL
 
+    if (ZTest){
+        return Block::blanks(boundsCompute,
+                             Block::make(Block::make(searchForUnderivedStart), tmpInitializeTemporary,
+                                         For::make(indexVarToExprMap[iterator.getIndexVar()],
+                                                   startBound,endBound,1,
+                                                   Block::make(IfThenElse::make(tmpCondition,tmpCornerZero,
+                                                                                Block::make(tmprecoveryWOguard,Block::make(loopsToTrackUnderived),tmpProducer)),tmpdeclInserterPosVars,tmpConsumer),
+                                                                                kind,
+                                                   ignoreVectorize ? ParallelUnit::NotParallel : forall.getParallelUnit(), ignoreVectorize ? 0 : forall.getUnrollFactor())));
+    }
 
   return Block::blanks(boundsCompute,
                        Block::make(Block::make(searchForUnderivedStart),
@@ -2141,6 +2171,11 @@ Stmt LowererImplImperative::lowerForallBody(Expr coordinate, IndexStmt stmt,
   Stmt appendCoords = appendCoordinate(appenders, coordinate);
 
   // TODO: Emit code to insert coordinates
+    ZOUT(initVals)ZNDL
+    ZOUT(declInserterPosVars)ZNDL
+    ZOUT(declLocatorPosVars)ZNDL
+    tmpdeclInserterPosVars = declInserterPosVars;
+    tmpdeclLocatorPosVars = declLocatorPosVars;
 
   return Block::make(initVals,
                      declInserterPosVars,
@@ -2541,7 +2576,7 @@ Stmt LowererImplImperative::lowerWhere(Where where) {
 
   Stmt initializeTemporary = temporaryValuesInitFree[0];
   Stmt freeTemporary = temporaryValuesInitFree[1];
-
+    ZOUT(initializeTemporary)ZNDL
   match(where.getConsumer(),
         std::function<void(const AssignmentNode*)>([&](const AssignmentNode* op) {
             if (op->lhs.getTensorVar().getOrder() > 0) {
@@ -2575,6 +2610,7 @@ Stmt LowererImplImperative::lowerWhere(Where where) {
     Stmt zeroInit = Store::make(values, p, ir::Literal::zero(temporary.getType().getDataType()));
     Stmt loopInit = For::make(p, 0, size, 1, zeroInit, LoopKind::Serial);
     initializeTemporary = Block::make(initializeTemporary, loopInit);
+
   }
 
   whereConsumers.push_back(consumer);
@@ -2593,6 +2629,7 @@ Stmt LowererImplImperative::lowerWhere(Where where) {
     const Expr indexListSizeExpr = tempToIndexListSize.at(temporary);
     const Stmt indexListSizeDecl = VarDecl::make(indexListSizeExpr, ir::Literal::make(0));
     initializeTemporary = Block::make(indexListSizeDecl, initializeTemporary);
+
   }
 
   if (restoreAtomicDepth) {
@@ -2604,6 +2641,12 @@ Stmt LowererImplImperative::lowerWhere(Where where) {
   whereTempsToResult.erase(where.getTemporary());
   //cout<<"lowerWhere return : ";
   //cout<<Block::make(initializeTemporary, producer, markAssignsAtomicDepth > 0 ? capturedLocatePos : ir::Stmt(), consumer,  freeTemporary)<<endl;
+    tmpProducer = producer;
+    tmpConsumer = consumer;
+    tmpInitializeTemporary = initializeTemporary;
+
+    ZOUT(producer)ZNDL
+
   return Block::make(initializeTemporary, producer, markAssignsAtomicDepth > 0 ? capturedLocatePos : ir::Stmt(), consumer,  freeTemporary);
 }
 
@@ -3217,6 +3260,9 @@ Stmt LowererImplImperative::defineScalarVariable(TensorVar var, bool zero) {
                      : Load::make(GetProperty::make(tensorVars.at(var),
                                                     TensorProperty::Values));
   tensorVars.find(var)->second = varValueIR;
+  Stmt init_assign = Assign::make(varValueIR, ir::Literal::zero(type));
+    ZOUT(init_assign)ZNDL
+    tmpCornerZero = init_assign;
   return VarDecl::make(varValueIR, init);
 }
 

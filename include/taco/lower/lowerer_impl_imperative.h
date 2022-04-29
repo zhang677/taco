@@ -586,7 +586,22 @@ private:
   /// Visitor methods can add code to emit it to the function footer.
   std::vector<ir::Stmt> footer;
 
-  class Visitor;
+  /// Ture if I'm testing
+  bool ZTest = true;
+
+  /// Exchange the temp Stmt
+  ir::Stmt tmpInitializeTemporary;
+  ir::Stmt tmpProducer;
+  ir::Stmt tmpConsumer;
+  ir::Expr tmpCondition;
+  ir::Stmt tmpdeclInserterPosVars;
+  ir::Stmt tmpdeclLocatorPosVars;
+  ir::Stmt tmpCornerZero;
+  ir::Stmt tmprecoveryWOguard;
+
+
+
+    class Visitor;
   friend class Visitor;
   std::shared_ptr<Visitor> visitor;
 
