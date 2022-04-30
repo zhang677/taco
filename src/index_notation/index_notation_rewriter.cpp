@@ -63,12 +63,12 @@ void IndexNotationRewriter::visit(const LiteralNode* op) {
 
 template <class T>
 IndexExpr visitBinaryOp(const T *op, IndexNotationRewriter *rw) {
-  cout<<"Old op1: "<<op->a<<endl;
-  cout<<"Old op2: "<<op->b<<endl;
+  //cout<<"Old op1: "<<op->a<<endl;
+  //cout<<"Old op2: "<<op->b<<endl;
   IndexExpr a = rw->rewrite(op->a);
   IndexExpr b = rw->rewrite(op->b);
-    cout<<"New op1: "<<a<<endl;
-    cout<<"New op2: "<<b<<endl;
+  //cout<<"New op1: "<<a<<endl;
+  //cout<<"New op2: "<<b<<endl;
   if (a == op->a && b == op->b) {
     return op;
   }
@@ -311,7 +311,28 @@ struct ReplaceRewriter : public IndexNotationRewriter {
 
   void visit(const AddNode* op) {
 
-    SUBSTITUTE_EXPR;
+      do {
+  IndexExpr e = op;
+  cout<<"exprSubstitutions: ";
+  bool contains = false;
+  IndexExpr find_key = op;
+  for (auto& i: exprSubstitutions){
+    cout<<i.first<<" , "<<i.second<<" , "<<(contains=(e==i.first))<<endl;
+    if (contains) {
+        find_key = i.first;
+    }
+  }
+  cout<<"e: "<<e<<endl;
+  //if (std::find(exprSubstitutions.begin(),exprSubstitutions.end(),e) != exprSubstitutions.end()) {
+  //if (util::contains(exprSubstitutions,e)){
+  if (contains){
+    cout<<"Detect! "<<endl;
+    expr = exprSubstitutions.at(find_key);
+  }
+  else {
+    IndexNotationRewriter::visit(op);
+  }
+} while(false);
   }
 
   void visit(const SubNode* op) {

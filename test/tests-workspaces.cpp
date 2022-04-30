@@ -761,15 +761,8 @@ namespace Temptest {
 
     }
 
-    TEST(workspaces, tile_test){
-        // FIXME: Disabled because currently the precompute algorithm does not appropriately
-        //        find the correct forall substmt to next the WhereNode in after i has been
-        //        split into i0 and i1. As an example, the first precompute below is incorrect
-        //        since it should transform
-        //        forall(i0, forall(i1, A() += B(i) * C(i))) -->
-        //        forall(i0, where(forall(i1, A() += ws(i1)), forall(i1, ws(i1) += B(i) * C(i))))
-        //
-        //        But currently the algorithm does
+    TEST(workspaces, test_ori_same){
+        //GENGHAN:i1temp has the same name as i1
         //        forall(i0, forall(i1, A() += B(i) * C(i))) -->
         //        where(forall(i1, A() += ws(i1)), forall(i0, forall(i1, ws(i1) += B(i) * C(i))))
 
@@ -826,6 +819,315 @@ namespace Temptest {
         expected.compute();
         ASSERT_TENSOR_EQ(expected, A);
     }
+    TEST(workspaces, test_ori_diff){
+        //GENGHAN:i1temp has different name with i1
+        //        forall(i0, forall(i1, A() += B(i) * C(i))) -->
+        //        where(forall(i1, A() += ws(i1)), forall(i0, forall(i1, ws(i1) += B(i) * C(i))))
+
+        int N = 1024;
+        Tensor<double> A("A");
+        Tensor<double> B("B", {N}, Format({Dense}));
+        Tensor<double> C("C", {N}, Format({Dense}));
+
+        for (int i = 0; i < N; i++) {
+            B.insert({i}, (double) i);
+            C.insert({i}, (double) i);
+        }
+
+        B.pack();
+        C.pack();
+
+        IndexVar i("i");
+        IndexVar i_bounded("i_bounded");
+        IndexVar i0("i0"), i1("i1"),i1tmp("i1tmp");
+        IndexExpr BExpr = B(i);
+        IndexExpr CExpr = C(i);
+        IndexExpr precomputedExpr = (BExpr) * (CExpr);
+        A() = precomputedExpr;
+
+        IndexStmt stmt = A.getAssignment().concretize();
+        TensorVar precomputed("ws", Type(Float64, {(size_t) 32}), taco::dense);
+
+        stmt = stmt.bound(i, i_bounded, (size_t) N, BoundType::MaxExact)
+                .split(i_bounded, i0, i1, 32)
+                .reorder({i0,i1});
+        stmt = stmt.precompute(precomputedExpr, i1, i1tmp, precomputed);
+
+        stmt = stmt.concretize();
+
+        A.compile(stmt);
+        A.assemble();
+        A.compute();
+
+        ir::IRPrinter irp = ir::IRPrinter(cout);
+
+        cout << stmt << endl;
+
+        std::shared_ptr<ir::CodeGen> codegen = ir::CodeGen::init_default(cout, ir::CodeGen::ImplementationGen);
+        ir::Stmt compute = lower(stmt, "compute", false, true);
+
+        irp.print(compute);
+        cout << endl;
+        codegen->compile(compute, false);
+
+        Tensor<double> expected("expected");
+        expected() = B(i) * C(i);
+        expected.compile();
+        expected.assemble();
+        expected.compute();
+        ASSERT_TENSOR_EQ(expected, A);
+    }
+    TEST(workspaces, test_new_same){
+        //GENGHAN:i1temp has the same name as i1
+        //        forall(i0, forall(i1, A() += B(i) * C(i))) -->
+        //        forall(i0, where(forall(i1, A() += ws(i1)), forall(i1, ws(i1) += B(i) * C(i))))
+        //        Use the hack part in transformations.cpp
+
+        int N = 1024;
+        Tensor<double> A("A");
+        Tensor<double> B("B", {N}, Format({Dense}));
+        Tensor<double> C("C", {N}, Format({Dense}));
+
+        for (int i = 0; i < N; i++) {
+            B.insert({i}, (double) i);
+            C.insert({i}, (double) i);
+        }
+
+        B.pack();
+        C.pack();
+
+        IndexVar i("i"),i0("i0"), i1("i1"),i1tmp("i1");
+        IndexExpr BExpr = B(i);
+        IndexExpr CExpr = C(i);
+        IndexExpr precomputedExpr = (BExpr) * (CExpr);
+        A() = precomputedExpr;
+
+        IndexStmt stmt = A.getAssignment().concretize();
+        TensorVar precomputed("ws", Type(Float64, {(size_t) 32}), taco::dense);
+
+        stmt = stmt
+                .split(i, i0, i1, 32)
+                .reorder({i0,i1})
+                .precompute(precomputedExpr, i1, i1tmp, precomputed);
+
+        stmt = stmt.concretize();
+
+        A.compile(stmt);
+        A.assemble();
+        A.compute();
+
+        _printToFile("success_tmp",stmt);
+
+        Tensor<double> expected("expected");
+        expected() = B(i) * C(i);
+        expected.compile();
+        expected.assemble();
+        expected.compute();
+        ASSERT_TENSOR_EQ(expected, A);
+    }
+    TEST(workspaces, test_new_diff){
+        //GENGHAN:i1temp has different name with i1
+        //        forall(i0, forall(i1, A() += B(i) * C(i))) -->
+        //        forall(i0, where(forall(i1, A() += ws(i1)), forall(i1, ws(i1) += B(i) * C(i))))
+        //        Use the hack part in transformations.cpp
+
+        int N = 1024;
+        Tensor<double> A("A");
+        Tensor<double> B("B", {N}, Format({Dense}));
+        Tensor<double> C("C", {N}, Format({Dense}));
+
+        for (int i = 0; i < N; i++) {
+            B.insert({i}, (double) i);
+            C.insert({i}, (double) i);
+        }
+
+        B.pack();
+        C.pack();
+
+        IndexVar i("i"),i0("i0"), i1("i1"),i1tmp("i1tmp");
+        IndexExpr precomputedExpr = B(i) * C(i);
+        A() = precomputedExpr;
+
+        IndexStmt stmt = A.getAssignment().concretize();
+        TensorVar precomputed("ws", Type(Float64, {(size_t) 32}), taco::dense);
+
+        stmt = stmt
+                .split(i, i0, i1, 32)
+                .reorder({i0,i1})
+                .precompute(precomputedExpr, i1, i1tmp, precomputed);
+
+        stmt = stmt.concretize();
+
+        A.compile(stmt);
+        A.assemble();
+        A.compute();
+
+        _printToFile("fail_tmp",stmt);
+
+        Tensor<double> expected("expected");
+        expected() = B(i) * C(i);
+        expected.compile();
+        expected.assemble();
+        expected.compute();
+        ASSERT_TENSOR_EQ(expected, A);
+    }
+
+    TEST(workspaces, chain_rule_fail_1) {
+        /// From workspace paper: If S2 modifies its tensor with an assignment statement, then (Any S1) where (Any S2) is equivalent with Any(S1 where S2)
+        /// FIXME: use of undeclared identifier 'jws1'
+
+        int N = 16;
+        Tensor<double> A("A", {N, N}, Format{Dense, Dense});
+        Tensor<double> B("B", {N, N}, Format{Dense, Dense});
+        Tensor<double> C("C", {N, N}, Format{Dense, Dense});
+        Tensor<double> D("D", {N, N}, Format{Dense, Dense});
+
+        for (int i = 0; i < N; i++) {
+            for (int j = 0; j < N; j++) {
+                B.insert({i, j}, (double) i);
+                C.insert({i, j}, (double) j);
+                D.insert({i, j}, (double) i * j);
+            }
+        }
+
+        IndexVar i("i"), j("j"),io("io"),jo("jo");
+        IndexExpr precomputedExpr = B(i, j) + C(i, j);
+        A(i, j) = precomputedExpr + D(i, j);
+        TensorVar ws1("ws1", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
+        TensorVar ws2("ws2", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
+
+        TensorVar Av("A", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
+        TensorVar Bv("B", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
+        TensorVar Cv("C", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
+        TensorVar Dv("D", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
+
+
+        IndexStmt stmt= where(forall(i,
+                                      forall(j,
+                                             Av(i,j)=ws2(i,j))),
+                               forall(i,
+                                      forall(j,
+                                             where(
+                                                     ws2(i,j) = ws1(i,j) + Dv(i,j),
+                                                     ws1(i,j) = Bv(i,j) + Cv(i,j)))));
+        cout<<stmt<<endl;
+        _printToFile("fail_chain",stmt);
+        A.compile(stmt.concretize());
+        A.assemble();
+        A.compute();
+
+        Tensor<double> expected("expected", {N, N}, Format{Dense, Dense});
+        expected(i, j) = B(i, j) + C(i, j) + D(i, j);
+        expected.compile();
+        expected.assemble();
+        expected.compute();
+        ASSERT_TENSOR_EQ(expected, A);
+
+    }
+
+    TEST(workspaces, chain_rule_fail_2) {
+        /// FIXME: The expression (ws1(i,j) + D(i,j)) is not in forall(i, forall(j, A(i,j) = B(i,j) + C(i,j) + D(i,j)))
+
+        int N = 16;
+        Tensor<double> A("A", {N, N}, Format{Dense, Dense});
+        Tensor<double> B("B", {N, N}, Format{Dense, Dense});
+        Tensor<double> C("C", {N, N}, Format{Dense, Dense});
+        Tensor<double> D("D", {N, N}, Format{Dense, Dense});
+
+        for (int i = 0; i < N; i++) {
+            for (int j = 0; j < N; j++) {
+                B.insert({i, j}, (double) i);
+                C.insert({i, j}, (double) j);
+                D.insert({i, j}, (double) i * j);
+            }
+        }
+
+        IndexVar i("i"), j("j");
+        IndexExpr precomputedExpr = B(i, j) + C(i, j);
+        A(i, j) = precomputedExpr + D(i, j);
+        TensorVar ws1("ws1", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
+        TensorVar ws2("ws2", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
+
+        TensorVar Av("A", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
+        TensorVar Bv("B", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
+        TensorVar Cv("C", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
+        TensorVar Dv("D", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
+
+
+        IndexStmt stmt = forall(i,
+                                 forall(j,
+                                        Av(i,j) = (Bv(i,j)+Cv(i,j))+Dv(i,j)));
+        stmt = stmt.precompute(Bv(i,j)+Cv(i,j), {i, j}, {i, j}, ws1);
+        stmt = stmt.precompute(ws1(i,j)+Dv(i,j), {i, j}, {i, j}, ws2);
+
+        A.compile(stmt.concretize());
+        A.assemble();
+        A.compute();
+
+        Tensor<double> expected("expected", {N, N}, Format{Dense, Dense});
+        expected(i, j) = B(i, j) + C(i, j) + D(i, j);
+        expected.compile();
+        expected.assemble();
+        expected.compute();
+        ASSERT_TENSOR_EQ(expected, A);
+        _printToCout(stmt);
+    }
+
+    TEST(workspaces, chain_rule) {
+        /// GENGHAN: Exactly How to generate correct foralls before consumer?
+
+        int N = 16;
+        Tensor<double> A("A", {N, N}, Format{Dense, Dense});
+        Tensor<double> B("B", {N, N}, Format{Dense, Dense});
+        Tensor<double> C("C", {N, N}, Format{Dense, Dense});
+        Tensor<double> D("D", {N, N}, Format{Dense, Dense});
+
+        for (int i = 0; i < N; i++) {
+            for (int j = 0; j < N; j++) {
+                B.insert({i, j}, (double) i);
+                C.insert({i, j}, (double) j);
+                D.insert({i, j}, (double) i * j);
+            }
+        }
+
+        IndexVar i("i"), j("j");
+        IndexExpr precomputedExpr = B(i, j) + C(i, j);
+        A(i, j) = precomputedExpr + D(i, j);
+        TensorVar ws1("ws1", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
+        TensorVar ws2("ws2", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
+
+        TensorVar Av("A", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
+        TensorVar Bv("B", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
+        TensorVar Cv("C", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
+        TensorVar Dv("D", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
+
+
+        IndexStmt stmt= where(forall(i,
+                                      forall(j,
+                                             Av(i,j)=ws2(i,j))),
+                               where(
+                                       forall(i,
+                                              forall(j,
+                                                     ws2(i,j) = ws1(i,j) + Dv(i,j))),
+                                       forall(i,
+                                              forall(j,
+                                                     ws1(i,j) = Bv(i,j) + Cv(i,j)))));
+
+        A.compile(stmt.concretize());
+        A.assemble();
+        A.compute();
+
+        Tensor<double> expected("expected", {N, N}, Format{Dense, Dense});
+        expected(i, j) = B(i, j) + C(i, j) + D(i, j);
+        expected.compile();
+        expected.assemble();
+        expected.compute();
+        ASSERT_TENSOR_EQ(expected, A);
+        _printToCout(stmt);
+    }
+
+
+
 
 }
 

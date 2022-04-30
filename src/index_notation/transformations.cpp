@@ -470,7 +470,7 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
           /// GENGHAN: Hack Begins. Use this and `i1tmp("i1")`
           /// to generate forall(i0, where(forall(i1, A() += ws(i1)), forall(i1, ws(i1) += B(i) * C(i))))
           /// If `i1tmp("i1tmp")` it will fail
-          /*
+
           outerForallIndexVars.clear();
           consumerForallIndexVars.clear();
           producerForallIndexVars.clear();
@@ -478,7 +478,7 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
           outerForallIndexVars.push_back(forallIndexVars[0]); // i0
           consumerForallIndexVars.push_back(consumerIndexVars[0]); // i1
           producerForallIndexVars.push_back(producerIndexVars[0]); // i1tmp
-          */
+
           /// GENGHAN: Hack Ends
           IndexStmt consumer = generateForalls(consumerAssignment, consumerForallIndexVars);
 

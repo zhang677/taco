@@ -1027,6 +1027,15 @@ IndexExpr operator/(const IndexExpr& lhs, const IndexExpr& rhs) {
   return new DivNode(lhs, rhs);
 }
 
+bool operator==(const IndexExpr& a, const IndexExpr& b){
+    if (!a.defined() && !b.defined()) {
+        return true;
+    }
+    if ((a.defined() && !b.defined()) || (!a.defined() && b.defined())) {
+        return false;
+    }
+    return Equals().check(a,b);
+}
 
 // class Access
 Access::Access(const AccessNode* n) : IndexExpr(n) {
