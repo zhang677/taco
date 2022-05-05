@@ -1102,12 +1102,14 @@ IndexStmt SetAssembleStrategy::apply(IndexStmt stmt, string* reason) const {
         stmt = (rhs != op->rhs) ? Assignment(lhs, rhs, reduceOp) : op;
         return;
       }
-
+        /// GENGHAN: Why do we need defined?
+        /*
       if (op->op.defined()) {
         reason = "Precondition failed: Ungrouped insertion not support for "
                  "output tensors that are scattered into";
         return;
       }
+         */
 
       queryResults[resultTensor] =
           std::vector<std::vector<TensorVar>>(resultTensor.getOrder());
