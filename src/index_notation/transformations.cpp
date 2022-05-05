@@ -290,7 +290,7 @@ static IndexStmt eliminateRedundantReductions(IndexStmt stmt,
 IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
   INIT_REASON(reason);
 
-  // Precondition: The expr to precompute is not in `stmt`
+  // Precondition: The expr to precompute is in `stmt`
   Assignment assignment = getAssignmentContainingExpr(stmt, getExpr());
   cout<<"Assignment: "<<assignment<<endl;
   if (!assignment.defined()) {
@@ -319,7 +319,7 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
       Assignment a = Assignment();
       match(stmt,
             function<void(const AssignmentNode*, Matcher*)>([&](const AssignmentNode* op, Matcher* ctx) {
-              a = Assignment(op);
+                a = Assignment(op);
             }),
             function<void(const WhereNode*, Matcher*)>([&](const WhereNode* op, Matcher* ctx) {
               ctx->match(op->consumer);
@@ -332,12 +332,17 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
             })
       );
 
+
+      /// GENGHAN: The final consumer is ws(i1) = B_new(i1) * C_new(i1). There's no ReductionVars.
+
+      /*
       if (!a.getReductionVars().empty()) {
         a = Assignment(a.getLhs(), a.getRhs(), Add());
       } else {
         a = Assignment(a.getLhs(), a.getRhs());
       }
-      //cout<<"Consumer Assignment return: "<<a<<endl;
+       */
+      cout<<"Consumer Assignment return: "<<a<<endl;
       return a;
     }
 
@@ -470,7 +475,7 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
           /// GENGHAN: Hack Begins. Use this and `i1tmp("i1")`
           /// to generate forall(i0, where(forall(i1, A() += ws(i1)), forall(i1, ws(i1) += B(i) * C(i))))
           /// If `i1tmp("i1tmp")` it will fail
-
+          /*
           outerForallIndexVars.clear();
           consumerForallIndexVars.clear();
           producerForallIndexVars.clear();
@@ -478,7 +483,7 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
           outerForallIndexVars.push_back(forallIndexVars[0]); // i0
           consumerForallIndexVars.push_back(consumerIndexVars[0]); // i1
           producerForallIndexVars.push_back(producerIndexVars[0]); // i1tmp
-
+          */
           /// GENGHAN: Hack Ends
           IndexStmt consumer = generateForalls(consumerAssignment, consumerForallIndexVars);
 

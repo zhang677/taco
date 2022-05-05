@@ -255,7 +255,7 @@ do {                                           \
   IndexExpr e = op;                            \
   cout<<"exprSubstitutions: ";                  \
   for (auto& i: exprSubstitutions){            \
-    cout<<i.first<<" , "<<i.second<<endl;                \
+    cout<<i.first<<"->"<<i.second<<endl;                \
   }                                             \
   cout<<"e: "<<e<<endl;                                 \
   if (util::contains(exprSubstitutions, e)) {  \
@@ -314,18 +314,20 @@ struct ReplaceRewriter : public IndexNotationRewriter {
       do {
   IndexExpr e = op;
   cout<<"exprSubstitutions: ";
-  bool contains = false;
+  bool _contains = false;
   IndexExpr find_key = op;
   for (auto& i: exprSubstitutions){
-    cout<<i.first<<" , "<<i.second<<" , "<<(contains=(e==i.first))<<endl;
-    if (contains) {
+    cout<<i.first<<" , "<<i.second<<" , "<<(_contains=(e==i.first))<<endl;
+    if (_contains) {
         find_key = i.first;
     }
   }
   cout<<"e: "<<e<<endl;
+  /// precompute_find equals as the cmp
   //if (std::find(exprSubstitutions.begin(),exprSubstitutions.end(),e) != exprSubstitutions.end()) {
-  //if (util::contains(exprSubstitutions,e)){
-  if (contains){
+  //if(exprSubstitutions.find(e)!=exprSubstitutions.end()){
+      //if (util::contains(exprSubstitutions,e)){
+  if (_contains){
     cout<<"Detect! "<<endl;
     expr = exprSubstitutions.at(find_key);
   }

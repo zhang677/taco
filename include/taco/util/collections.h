@@ -30,8 +30,8 @@ bool contains(const std::set<V> &container, const V &value) {
 /// Query whether a map contains an element
 template <typename K, typename V>
 bool contains(const std::map<K,V> &container, const K &key) {
-    //return std::find(container.begin(),container.end(),key) != container.end();
-  return container.find(key) != container.end();
+  //return std::find(container.begin(),container.end(),key) != container.end(); // ==
+  return container.find(key) != container.end(); // <
 }
 
 

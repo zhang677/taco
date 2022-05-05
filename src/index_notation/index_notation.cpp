@@ -2088,10 +2088,21 @@ const std::vector<IndexVar>& Assignment::getFreeVars() const {
 std::vector<IndexVar> Assignment::getReductionVars() const {
   vector<IndexVar> freeVars = getLhs().getIndexVars();
   set<IndexVar> seen(freeVars.begin(), freeVars.end());
+  /// GENGHAN: Debug
+  /*
+  std::cout<<"Seen: ";
+  for (auto& var: seen){
+      std::cout<<var<<" , ";
+  }
+  cout<<endl;
+  */
   vector<IndexVar> reductionVars;
+
   match(getRhs(),
     std::function<void(const AccessNode*)>([&](const AccessNode* op) {
-    for (auto& var : op->indexVars) {
+        //std::cout<<"Var: ";
+        for (auto& var : op->indexVars) {
+      //cout<<var<<" , ";
       if (!util::contains(seen, var)) {
         reductionVars.push_back(var);
         seen.insert(var);
@@ -2099,6 +2110,7 @@ std::vector<IndexVar> Assignment::getReductionVars() const {
     }
     })
   );
+  //std::cout<<std::endl;
   return reductionVars;
 }
 

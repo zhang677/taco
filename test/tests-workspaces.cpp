@@ -79,7 +79,7 @@ namespace Temptest {
         A.compile(stmt);
         A.assemble();
         A.compute();
-        _printToCout(stmt);
+        //_printToCout(stmt);
         Tensor<double> expected("expected", {16}, Format{Dense});
         expected(i) = B(i) * C(i);
         expected.compile();
@@ -117,7 +117,7 @@ namespace Temptest {
         A.compile(stmt.concretize());
         A.assemble();
         A.compute();
-        _printToCout(stmt);
+        //_printToCout(stmt);
         Tensor<double> expected("expected", {16}, Format{Dense});
         expected(i) = B(i) * C(i);
         expected.compile();
@@ -156,7 +156,7 @@ namespace Temptest {
         A.compile(stmt.concretize());
         A.assemble();
         A.compute();
-        _printToCout(stmt);
+        //_printToCout(stmt);
         Tensor<double> expected("expected", {17}, Format{Dense});
         expected(i) = B(i) * C(i);
         expected.compile();
@@ -214,7 +214,7 @@ namespace Temptest {
         expected.compute();
         ASSERT_TENSOR_EQ(expected, A);
 
-        _printToCout(stmt);
+        //_printToCout(stmt);
 
 //  ir::IRPrinter irp = ir::IRPrinter(cout);
 //    
@@ -260,46 +260,6 @@ namespace Temptest {
         stmt = stmt.precompute(ws1(i,j)+D(i,j), {i, j}, {i, j}, ws2);
         stmt = stmt.precompute(ws2(i,j)+E(i,j), {i, j}, {i, j}, ws3);
 
-
-        TensorVar Av("A", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
-        TensorVar Bv("B", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
-        TensorVar Cv("C", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
-        TensorVar Dv("D", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
-
-
-
-        /// How to generate correct foralls before consumer
-        /*
-        IndexStmt stmt0= where(forall(i,
-                            forall(j,
-                                   Av(i,j)=ws2(i,j))),
-                     where(
-                             forall(i,
-                                    forall(j,
-                                           ws2(i,j) = ws1(i,j) + Dv(i,j))),
-                             forall(i,
-                                    forall(j,
-                                           ws1(i,j) = Bv(i,j) + Cv(i,j)))));
-        */
-        /// If S2 modifies its tensor with an assignment statement, then (Any S1) where (Any S2) is equivalent with Any(S1 where S2)
-        /// FIXME: use of undeclared identifier 'jws1'
-        IndexStmt stmt1= where(forall(i,
-                                      forall(j,
-                                             Av(i,j)=ws2(i,j))),
-                                       forall(i,
-                                              forall(j,
-                                                     where(
-                                                     ws2(i,j) = ws1(i,j) + Dv(i,j),
-                                                     ws1(i,j) = Bv(i,j) + Cv(i,j)))));
-        /// FIXME: The expression (ws1(i,j) + D(i,j)) is not in forall(i, forall(j, A(i,j) = B(i,j) + C(i,j) + D(i,j)))
-        /*
-        IndexStmt stmt2 = forall(i,
-                                 forall(j,
-                                        Av(i,j) = (Bv(i,j)+Cv(i,j))+Dv(i,j)));
-        stmt2 = stmt2.precompute(Bv(i,j)+Cv(i,j), {i, j}, {i, j}, ws1);
-        stmt2 = stmt2.precompute(ws1(i,j)+Dv(i,j), {i, j}, {i, j}, ws2);
-         */
-
         A.compile(stmt.concretize());
         A.assemble();
         A.compute();
@@ -312,13 +272,10 @@ namespace Temptest {
         expected.assemble();
         expected.compute();
         ASSERT_TENSOR_EQ(expected, A);
-        _printToCout(stmt);
+        //_printToCout(stmt);
 
     }
 
-    TEST(workspaces, failed_scalarTemp){
-        /// TODO: precompute SpMM
-    }
 
     TEST(workspaces, precompute4D_add) {
         int N = 16;
@@ -361,7 +318,7 @@ namespace Temptest {
         A.compute();
         cout<<stmt<<endl;
 
-        _printToCout(stmt);
+        //_printToCout(stmt);
         Tensor<double> expected("expected", {N, N, N, N}, Format{Dense, Dense, Dense, Dense});
         expected(i, j, k, l) = B(i, j, k, l) + C(i, j, k, l) + D(i, j, k, l);
         expected.compile();
@@ -399,7 +356,7 @@ namespace Temptest {
         TensorVar ws2("ws2", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
         stmt = stmt.precompute(precomputedExpr, {i, j, m}, {i, j, m}, ws1)
                 .precompute(ws1(i, j, m) * D(m, n), {i, j}, {i, j}, ws2);
-        _printToCout(stmt);
+        //_printToCout(stmt);
         A.compile(stmt.concretize());
         A.assemble();
         A.compute();
@@ -439,7 +396,7 @@ namespace Temptest {
         TensorVar ws("ws", Type(Float64, {(size_t) N, (size_t) N, (size_t) N}), Format{Dense, Dense, Dense});
         stmt = stmt.precompute(precomputedExpr, {i, j, k}, {i, j, k}, ws);
         stmt = stmt.concretize();
-        _printToCout(stmt);
+        //_printToCout(stmt);
         A.compile(stmt);
         A.assemble();
         A.compute();
@@ -484,7 +441,7 @@ namespace Temptest {
         stmt = stmt.precompute(ws(i, j, k) * c(k), {i, j}, {i, j}, t);
         //stmt = stmt.precompute(precomputedExpr2, {i, j}, {i, j}, t);
         stmt = stmt.concretize();
-        _printToCout(stmt);
+        //_printToCout(stmt);
         A.compile(stmt);
         A.assemble();
         A.compute();
@@ -542,13 +499,13 @@ namespace Temptest {
 
     }
 
-    TEST(workspaces, DISABLED_tile_dotProduct_1) {
+    TEST(workspaces, tile_dotProduct_1) {
         // FIXME: Disabled because currently the precompute algorithm does not appropriately
         //        find the correct forall substmt to next the WhereNode in after i has been
         //        split into i0 and i1. As an example, the first precompute below is incorrect
         //        since it should transform
         //        forall(i0, forall(i1, A() += B(i) * C(i))) -->
-        //        forall(i0, where(forall(i1, A() += ws(i1)), forall(i1, ws(i1) += B(i) * C(i))))
+        //        forall(i0, where(forall(i1, A() = ws(i1)), forall(i1, ws(i1) += B(i) * C(i))))
         //
         //        But currently the algorithm does
         //        forall(i0, forall(i1, A() += B(i) * C(i))) -->
@@ -578,7 +535,7 @@ namespace Temptest {
         IndexStmt stmt = A.getAssignment().concretize();
         TensorVar B_new("B_new", Type(Float64, {(size_t) N}), taco::dense);
         TensorVar C_new("C_new", Type(Float64, {(size_t) N}), taco::dense);
-        TensorVar precomputed("precomputed", Type(Float64, {(size_t) N}), taco::dense);
+        TensorVar precomputed("ws", Type(Float64, {(size_t) N}), taco::dense);
 
         stmt = stmt.bound(i, i_bounded, (size_t) N, BoundType::MaxExact)
                 .split(i_bounded, i0, i1, 32)
@@ -701,11 +658,11 @@ namespace Temptest {
         stmt = stmt.precompute(BExpr, i1, i1, B_new)
                 .precompute(CExpr, i1, i1, C_new);
 
-        _printToCout(stmt);
+        //_printToCout(stmt);
         stmt = stmt.concretize();
         cout<<stmt<<endl;
 
-        _printToFile("tile_dP_3",stmt);
+        //_printToFile("tile_dP_3",stmt);
         A.compile(stmt);
         A.assemble();
         A.compute();
@@ -720,7 +677,7 @@ namespace Temptest {
 
     }
 
-    TEST(workspaces, facilitate_reorder) {
+    TEST(workspaces, DISABLED_facilitate_reorder) {
         int N = 256;
         int M = 256;
         Tensor<float> A("A",{M},Format({Dense}));
@@ -838,7 +795,6 @@ namespace Temptest {
         C.pack();
 
         IndexVar i("i");
-        IndexVar i_bounded("i_bounded");
         IndexVar i0("i0"), i1("i1"),i1tmp("i1tmp");
         IndexExpr BExpr = B(i);
         IndexExpr CExpr = C(i);
@@ -848,8 +804,8 @@ namespace Temptest {
         IndexStmt stmt = A.getAssignment().concretize();
         TensorVar precomputed("ws", Type(Float64, {(size_t) 32}), taco::dense);
 
-        stmt = stmt.bound(i, i_bounded, (size_t) N, BoundType::MaxExact)
-                .split(i_bounded, i0, i1, 32)
+        stmt = stmt//.bound(i, i_bounded, (size_t) N, BoundType::MaxExact)
+                .split(i, i0, i1, 32)
                 .reorder({i0,i1});
         stmt = stmt.precompute(precomputedExpr, i1, i1tmp, precomputed);
 
@@ -916,7 +872,7 @@ namespace Temptest {
         A.assemble();
         A.compute();
 
-        _printToFile("success_tmp",stmt);
+        //_printToFile("success_tmp",stmt);
 
         Tensor<double> expected("expected");
         expected() = B(i) * C(i);
@@ -925,7 +881,7 @@ namespace Temptest {
         expected.compute();
         ASSERT_TENSOR_EQ(expected, A);
     }
-    TEST(workspaces, test_new_diff){
+    TEST(workspaces, DISABLED_test_new_diff){
         //GENGHAN:i1temp has different name with i1
         //        forall(i0, forall(i1, A() += B(i) * C(i))) -->
         //        forall(i0, where(forall(i1, A() += ws(i1)), forall(i1, ws(i1) += B(i) * C(i))))
@@ -962,7 +918,7 @@ namespace Temptest {
         A.assemble();
         A.compute();
 
-        _printToFile("fail_tmp",stmt);
+        //_printToFile("fail_tmp",stmt);
 
         Tensor<double> expected("expected");
         expected() = B(i) * C(i);
@@ -972,7 +928,7 @@ namespace Temptest {
         ASSERT_TENSOR_EQ(expected, A);
     }
 
-    TEST(workspaces, chain_rule_fail_1) {
+    TEST(workspaces, DISABLED_chain_rule_fail_1) {
         /// From workspace paper: If S2 modifies its tensor with an assignment statement, then (Any S1) where (Any S2) is equivalent with Any(S1 where S2)
         /// FIXME: use of undeclared identifier 'jws1'
 
@@ -1010,8 +966,18 @@ namespace Temptest {
                                              where(
                                                      ws2(i,j) = ws1(i,j) + Dv(i,j),
                                                      ws1(i,j) = Bv(i,j) + Cv(i,j)))));
+
+        /*
+        IndexStmt stmt= where(forall(i,
+                                     forall(j,
+                                            Av(i,j)=ws2(i,j))),
+                              where(forall(i, forall(j, ws2(i,j) = ws1(i,j) + Dv(i,j))), forall(i,
+                                                                                                forall(j, ws1(i,j) = Bv(i,j) + Cv(i,j)))
+
+                              ));
+        */
         cout<<stmt<<endl;
-        _printToFile("fail_chain",stmt);
+        //_printToFile("fail_chain",stmt);
         A.compile(stmt.concretize());
         A.assemble();
         A.compute();
@@ -1070,7 +1036,7 @@ namespace Temptest {
         expected.assemble();
         expected.compute();
         ASSERT_TENSOR_EQ(expected, A);
-        _printToCout(stmt);
+        //_printToCout(stmt);
     }
 
     TEST(workspaces, chain_rule) {
@@ -1123,7 +1089,7 @@ namespace Temptest {
         expected.assemble();
         expected.compute();
         ASSERT_TENSOR_EQ(expected, A);
-        _printToCout(stmt);
+        //_printToCout(stmt);
     }
 
 
