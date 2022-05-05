@@ -53,6 +53,12 @@ void printToFile(string filename, IndexStmt stmt) {
   source_file << source.str();
   source_file.close();
 }
+void printIRToCout(IndexStmt stmt) {
+    std::shared_ptr<ir::CodeGen> codegen = ir::CodeGen::init_default(cout, ir::CodeGen::ImplementationGen);
+    ir::Stmt compute = lower(stmt, "compute", false, true);
+    ir::IRPrinter irp = ir::IRPrinter(cout);
+    irp.print(compute);
+}
 
 IndexStmt scheduleSpMVCPU(IndexStmt stmt, int CHUNK_SIZE=16) {
   IndexVar i0("i0"), i1("i1"), kpos("kpos"), kpos0("kpos0"), kpos1("kpos1");
@@ -93,7 +99,7 @@ IndexStmt scheduleSpGEMMCPU(IndexStmt stmt, bool doPrecompute) {
                 {result.getType().getShape().getDimension(1)}), taco::dense);
     stmt = stmt.precompute(assign.getRhs(), j, j, w);
   }
-  stmt = stmt.assemble(result, AssembleStrategy::Insert, true);
+  stmt = stmt.assemble(result, AssembleStrategy::Append, true);
   auto qi_stmt = stmt.as<Assemble>().getQueries();
   IndexVar qi;
   if (isa<Where>(qi_stmt)) {
@@ -101,11 +107,12 @@ IndexStmt scheduleSpGEMMCPU(IndexStmt stmt, bool doPrecompute) {
   } else {
     qi = qi_stmt.as<Forall>().getIndexVar();
   }
+  /*
   stmt = stmt.parallelize(i, ParallelUnit::CPUThread,
                           OutputRaceStrategy::NoRaces)
              .parallelize(qi, ParallelUnit::CPUThread,
                           OutputRaceStrategy::NoRaces);
-
+    */
   return stmt;
 }
 
@@ -692,10 +699,11 @@ TEST_P(spgemm, scheduling_eval) {
   IndexStmt stmt = C.getAssignment().concretize();
   stmt = scheduleSpGEMMCPU(stmt, doPrecompute);
 
+  printIRToCout(stmt);
+
   C.compile(stmt);
   C.assemble();
   C.compute();
-
   Tensor<double> expected("expected", {NUM_I, NUM_K}, {Dense, Dense});
   expected(i, k) = A(i, j) * B(j, k);
   expected.compile();
@@ -703,13 +711,16 @@ TEST_P(spgemm, scheduling_eval) {
   expected.compute();
   ASSERT_TENSOR_EQ(expected, C);
 }
-
+/*
 INSTANTIATE_TEST_CASE_P(spgemm, spgemm,
                         Values(std::make_tuple(CSR, CSR, true),
                                std::make_tuple(DCSR, CSR, true),
                                std::make_tuple(DCSR, DCSR, true),
                                std::make_tuple(CSR, CSC, false),
                                std::make_tuple(DCSR, DCSC, false)));
+                               */
+INSTANTIATE_TEST_CASE_P(spgemm, spgemm,
+                        Values(std::make_tuple(CSR, CSR, true)));
 
 TEST(scheduling_eval, spmataddCPU) {
   if (should_use_CUDA_codegen()) {

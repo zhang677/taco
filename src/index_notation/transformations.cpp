@@ -335,13 +335,13 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
 
       /// GENGHAN: The final consumer is ws(i1) = B_new(i1) * C_new(i1). There's no ReductionVars.
 
-      /*
+/*
       if (!a.getReductionVars().empty()) {
         a = Assignment(a.getLhs(), a.getRhs(), Add());
       } else {
         a = Assignment(a.getLhs(), a.getRhs());
       }
-       */
+*/
       cout<<"Consumer Assignment return: "<<a<<endl;
       return a;
     }
