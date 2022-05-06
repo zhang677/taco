@@ -569,7 +569,7 @@ namespace Temptest {
         ASSERT_TENSOR_EQ(expected, A);
     }
 
-    TEST(workspaces, DISABLED_tile_dotProduct_2) {
+    TEST(workspaces, tile_dotProduct_2) {
         // FIXME: This is also currently disabled since split(...) scheduling commands
         // only split on the FIRST INSTANCE of an indexVar (assumes only one).
         // This is wrong if the indexVar is not renamed across iw_vars since an indexVar can

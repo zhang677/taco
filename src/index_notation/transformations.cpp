@@ -381,11 +381,6 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
             if (child == indexVar)
               contains = true;
           }
-        } else if (provGraph.isFullyDerived(indexVar) && !provGraph.isFullyDerived(i)) {
-          for (auto &child : provGraph.getFullyDerivedDescendants(indexVar)) {
-            if (child == i)
-              contains = true;
-          }
         }
       }
       return contains;
@@ -491,6 +486,7 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
           Where where(consumer, producer);
 
           stmt = generateForalls(where, outerForallIndexVars);
+
           return;
         }
       }
@@ -505,6 +501,7 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
   rewriter.forallIndexVarList = forallIndexVars;
   cout<<"Init Stmt:"<<stmt<<endl;
   stmt = rewriter.rewrite(stmt);
+  /// Add another rewriter
   cout<<"Final Stmt:"<<stmt<<endl;
 
   return stmt;
