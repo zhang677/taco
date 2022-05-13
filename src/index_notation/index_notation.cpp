@@ -2113,7 +2113,8 @@ std::vector<IndexVar> Assignment::getReductionVars() const {
   std::cout<<std::endl;
 
   /// GENGHAN: l and r Rel
-  vector<IndexVar> RVars;
+  set<IndexVar> lseen(freeVars.begin(), freeVars.end());
+  vector<IndexVar> RVars ;
     match(getRhs(),
           std::function<void(const AccessNode*)>([&](const AccessNode* op) {
               for (auto& var : op->indexVars) {
@@ -2124,11 +2125,11 @@ std::vector<IndexVar> Assignment::getReductionVars() const {
     enum Rel {equal, none, lcr, rcl, inter};
     Rel rel = equal;
     std::vector<IndexVar> v_inter;
-    int lnum = seen.size();
+    int lnum = lseen.size();
     int rnum = rseen.size();
     int rcl_num = 0;
     for (auto & var : rseen){
-        if (util::contains(seen, var)) {
+        if (util::contains(lseen, var)) {
             rcl_num += 1;
         }
     }
@@ -2148,12 +2149,16 @@ std::vector<IndexVar> Assignment::getReductionVars() const {
     else {
         rel = none;
     }
+
+    if (lnum == 0 && rel == none) {
+        rel = rcl;
+    }
     switch (rel) {
         case none: reductionVars.clear(); return reductionVars; // =
         case rcl: return reductionVars; // +=
         case lcr: reductionVars.clear(); return reductionVars; // =
         case inter: return reductionVars; // +=
-        case equal: reductionVars.clear(); return reductionVars;//return RVars;// // = OR +=
+        case equal: reductionVars.clear(); return reductionVars;//return RVars;//reductionVars.clear(); return reductionVars;//return RVars;// // = OR +=
     }
     /// GENGHAN: END
   return reductionVars;
