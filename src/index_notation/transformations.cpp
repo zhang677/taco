@@ -309,6 +309,8 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
 
   ProvenanceGraph provGraph = ProvenanceGraph(stmt);
 
+
+
   struct PrecomputeRewriter : public IndexNotationRewriter {
     using IndexNotationRewriter::visit;
     Precompute precompute;
@@ -335,13 +337,13 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
 
       /// GENGHAN: The final consumer is ws(i1) = B_new(i1) * C_new(i1). There's no ReductionVars.
 
-/*
+
       if (!a.getReductionVars().empty()) {
         a = Assignment(a.getLhs(), a.getRhs(), Add());
       } else {
         a = Assignment(a.getLhs(), a.getRhs());
       }
-*/
+
       cout<<"Consumer Assignment return: "<<a<<endl;
       return a;
     }
@@ -490,20 +492,131 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
           return;
         }
       }
-
       IndexNotationRewriter::visit(node);
     }
   };
 
-  PrecomputeRewriter rewriter;
+    struct RedundentVisitor: public IndexNotationVisitor {
+        using IndexNotationVisitor::visit;
+
+        std::vector<Assignment>& to_change;
+        std::vector<IndexVar> ctx_stack;
+        int ctx_num;
+        bool in_where;
+        const ProvenanceGraph& provGraph;
+
+        RedundentVisitor(std::vector<Assignment>& to_change, const ProvenanceGraph& provGraph):to_change(to_change), provGraph(provGraph),ctx_num(0),in_where(false) {}
+
+        void visit(const ForallNode* node) {
+            Forall foralli(node);
+            IndexVar var = foralli.getIndexVar();
+            ctx_stack.push_back(var);
+            if (in_where) {
+                ctx_num++;
+            }
+            cout<<"ctx_num: "<<ctx_num<<endl;
+            IndexNotationVisitor::visit(node);
+        }
+        void visit(const WhereNode* node) {
+            in_where = true;
+            IndexNotationVisitor::visit(node->consumer);
+            for (int i = 0; i < ctx_num; i++){
+                ctx_stack.pop_back();
+            }
+            ctx_num = 0;
+            IndexNotationVisitor::visit(node->producer);
+            for (int i = 0; i < ctx_num; i++){
+                ctx_stack.pop_back();
+            }
+            ctx_num = 0;
+            in_where = false;
+            IndexNotationVisitor::visit(node);
+        }
+        void visit(const AssignmentNode* node) {
+            Assignment a(node->lhs, node->rhs, node->op);
+            vector<IndexVar> freeVars = a.getLhs().getIndexVars();
+            set<IndexVar> seen(freeVars.begin(), freeVars.end());
+            vector<IndexVar> RVars;
+            bool has_sibling = false;
+            match(a.getRhs(),
+                  std::function<void(const AccessNode*)>([&](const AccessNode* op) {
+                      for (auto& var : op->indexVars) {
+                          RVars.push_back(var);
+                          for (auto& svar : ctx_stack) {
+                              if (provGraph.getUnderivedAncestors(var)[0] == provGraph.getUnderivedAncestors(svar)[0]) {
+                                  has_sibling = true;
+                              }
+                          }
+                      }
+                  }));
+            cout<<"ctx_stack: ";
+            for (auto& v: ctx_stack){
+                cout<<"("<<v<<","<<provGraph.getUnderivedAncestors(v)[0]<<")"<<" , ";
+            }
+            cout<<endl;
+            set<IndexVar> rseen(RVars.begin(), RVars.end());
+            std::vector<IndexVar> v_inter;
+            int lnum = seen.size();
+            int rnum = rseen.size();
+            int rcl_num = 0;
+            bool is_equal = false;
+            for (auto & var : rseen){
+                if (util::contains(seen, var)) {
+                    rcl_num += 1;
+                }
+            }
+            if ((rcl_num == lnum) && (rcl_num == rnum)) {
+                is_equal = true;
+            } else {
+                is_equal = false;
+            }
+
+            if (is_equal && has_sibling) {
+                to_change.push_back(a);
+            }
+            IndexNotationVisitor::visit(node);
+        }
+    };
+
+    struct RedundentRewriter: public IndexNotationRewriter {
+        using IndexNotationRewriter::visit;
+        std::set<Assignment> to_change;
+        RedundentRewriter(std::vector<Assignment>& to_change):to_change(to_change.begin(),to_change.end()){}
+
+        void visit(const AssignmentNode* node) {
+            Assignment a(node->lhs, node->rhs, node->op);
+            for (auto & v: to_change) {
+                cout<<"Current v: "<<v<<" Current a: "<<a<<endl;
+                if ((v.getLhs() == a.getLhs()) && (v.getRhs() == a.getRhs()) ) {
+                    stmt = Assignment(a.getLhs(), a.getRhs(), Add());
+                    cout<<"Change Stmt: "<<stmt<<endl;
+                    return;
+                }
+            }
+            IndexNotationRewriter::visit(node);
+        }
+
+
+    };
+
+    PrecomputeRewriter rewriter;
   rewriter.precompute = *this;
   rewriter.provGraph = provGraph;
   rewriter.forallIndexVarList = forallIndexVars;
   cout<<"Init Stmt:"<<stmt<<endl;
   stmt = rewriter.rewrite(stmt);
   /// Add another rewriter
+  cout<<"Temp Stmt:"<<stmt<<endl;
+  std::vector<Assignment> to_change;
+  RedundentVisitor findVisitor(to_change, provGraph);
+  stmt.accept(&findVisitor);
+  cout<<"To change: "<<endl;
+  for (auto& v: to_change) {
+      cout<<v<<endl;
+  }
+  RedundentRewriter ReRewriter(to_change);
+  stmt = ReRewriter.rewrite(stmt);
   cout<<"Final Stmt:"<<stmt<<endl;
-
   return stmt;
 }
 
@@ -1100,13 +1213,11 @@ IndexStmt SetAssembleStrategy::apply(IndexStmt stmt, string* reason) const {
         return;
       }
         /// GENGHAN: Why do we need defined?
-        /*
       if (op->op.defined()) {
-        reason = "Precondition failed: Ungrouped insertion not support for "
-                 "output tensors that are scattered into";
-        return;
+          reason = "Precondition failed: Ungrouped insertion not support for "
+                   "output tensors that are scattered into";
+          return;
       }
-         */
 
       queryResults[resultTensor] =
           std::vector<std::vector<TensorVar>>(resultTensor.getOrder());

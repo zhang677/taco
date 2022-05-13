@@ -599,7 +599,7 @@ namespace Temptest {
         IndexStmt stmt = A.getAssignment().concretize();
         TensorVar B_new("B_new", Type(Float64, {(size_t) N}), taco::dense);
         TensorVar C_new("C_new", Type(Float64, {(size_t) N}), taco::dense);
-        TensorVar precomputed("precomputed", Type(Float64, {(size_t) N}), taco::dense);
+        TensorVar precomputed("ws", Type(Float64, {(size_t) N}), taco::dense);
 
         stmt = stmt.precompute(precomputedExpr, i, i, precomputed);
 
@@ -872,7 +872,7 @@ namespace Temptest {
         A.assemble();
         A.compute();
 
-        //_printToFile("success_tmp",stmt);
+        _printToFile("success_tmp",stmt);
 
         Tensor<double> expected("expected");
         expected() = B(i) * C(i);
@@ -881,7 +881,7 @@ namespace Temptest {
         expected.compute();
         ASSERT_TENSOR_EQ(expected, A);
     }
-    TEST(workspaces, DISABLED_test_new_diff){
+    TEST(workspaces, test_new_diff){
         //GENGHAN:i1temp has different name with i1
         //        forall(i0, forall(i1, A() += B(i) * C(i))) -->
         //        forall(i0, where(forall(i1, A() += ws(i1)), forall(i1, ws(i1) += B(i) * C(i))))
@@ -918,7 +918,7 @@ namespace Temptest {
         A.assemble();
         A.compute();
 
-        //_printToFile("fail_tmp",stmt);
+        _printToFile("fail_tmp",stmt);
 
         Tensor<double> expected("expected");
         expected() = B(i) * C(i);

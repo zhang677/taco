@@ -2089,20 +2089,20 @@ std::vector<IndexVar> Assignment::getReductionVars() const {
   vector<IndexVar> freeVars = getLhs().getIndexVars();
   set<IndexVar> seen(freeVars.begin(), freeVars.end());
   /// GENGHAN: Debug
-  /*
+
   std::cout<<"Seen: ";
   for (auto& var: seen){
       std::cout<<var<<" , ";
   }
   cout<<endl;
-  */
+
   vector<IndexVar> reductionVars;
 
   match(getRhs(),
     std::function<void(const AccessNode*)>([&](const AccessNode* op) {
-        //std::cout<<"Var: ";
+        std::cout<<"Var: ";
         for (auto& var : op->indexVars) {
-      //cout<<var<<" , ";
+      cout<<var<<" , ";
       if (!util::contains(seen, var)) {
         reductionVars.push_back(var);
         seen.insert(var);
@@ -2110,7 +2110,52 @@ std::vector<IndexVar> Assignment::getReductionVars() const {
     }
     })
   );
-  //std::cout<<std::endl;
+  std::cout<<std::endl;
+
+  /// GENGHAN: l and r Rel
+  vector<IndexVar> RVars;
+    match(getRhs(),
+          std::function<void(const AccessNode*)>([&](const AccessNode* op) {
+              for (auto& var : op->indexVars) {
+                  RVars.push_back(var);
+              }
+          }));
+    set<IndexVar> rseen(RVars.begin(), RVars.end());
+    enum Rel {equal, none, lcr, rcl, inter};
+    Rel rel = equal;
+    std::vector<IndexVar> v_inter;
+    int lnum = seen.size();
+    int rnum = rseen.size();
+    int rcl_num = 0;
+    for (auto & var : rseen){
+        if (util::contains(seen, var)) {
+            rcl_num += 1;
+        }
+    }
+    if (rcl_num == 0) {
+        rel = none;
+    }
+    else if ((rcl_num<lnum) && (rcl_num == rnum)){
+        rel = lcr;
+    }
+    else if ((rcl_num<lnum) && (rcl_num<rnum)){
+        rel = inter;
+    } else if ((rcl_num == lnum) && (rcl_num == rnum)){
+        rel = equal;
+    } else if ((rcl_num == lnum) && (rcl_num<rnum)) {
+        rel = rcl;
+    }
+    else {
+        rel = none;
+    }
+    switch (rel) {
+        case none: reductionVars.clear(); return reductionVars; // =
+        case rcl: return reductionVars; // +=
+        case lcr: reductionVars.clear(); return reductionVars; // =
+        case inter: return reductionVars; // +=
+        case equal: reductionVars.clear(); return reductionVars;//return RVars;// // = OR +=
+    }
+    /// GENGHAN: END
   return reductionVars;
 }
 
