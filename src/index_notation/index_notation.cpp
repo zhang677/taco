@@ -2111,10 +2111,14 @@ std::vector<IndexVar> Assignment::getReductionVars() const {
     })
   );
   std::cout<<std::endl;
+  return reductionVars;
+}
 
-  /// GENGHAN: l and r Rel
-  set<IndexVar> lseen(freeVars.begin(), freeVars.end());
-  vector<IndexVar> RVars ;
+/// GENGHAN: l and r Rel
+IndexSetRel Assignment::getIndexSetRel() const {
+    vector<IndexVar> freeVars = getLhs().getIndexVars();
+    set<IndexVar> lseen(freeVars.begin(), freeVars.end());
+    vector<IndexVar> RVars ;
     match(getRhs(),
           std::function<void(const AccessNode*)>([&](const AccessNode* op) {
               for (auto& var : op->indexVars) {
@@ -2122,8 +2126,7 @@ std::vector<IndexVar> Assignment::getReductionVars() const {
               }
           }));
     set<IndexVar> rseen(RVars.begin(), RVars.end());
-    enum Rel {equal, none, lcr, rcl, inter};
-    Rel rel = equal;
+    IndexSetRel rel = equal;
     std::vector<IndexVar> v_inter;
     int lnum = lseen.size();
     int rnum = rseen.size();
@@ -2153,6 +2156,7 @@ std::vector<IndexVar> Assignment::getReductionVars() const {
     if (lnum == 0 && rel == none) {
         rel = rcl;
     }
+    /*
     switch (rel) {
         case none: reductionVars.clear(); return reductionVars; // =
         case rcl: return reductionVars; // +=
@@ -2160,8 +2164,8 @@ std::vector<IndexVar> Assignment::getReductionVars() const {
         case inter: return reductionVars; // +=
         case equal: reductionVars.clear(); return reductionVars;//return RVars;//reductionVars.clear(); return reductionVars;//return RVars;// // = OR +=
     }
-    /// GENGHAN: END
-  return reductionVars;
+     */
+    return rel;
 }
 
 template <> bool isa<Assignment>(IndexStmt s) {

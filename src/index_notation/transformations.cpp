@@ -337,13 +337,14 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
 
       /// GENGHAN: The final consumer is ws(i1) = B_new(i1) * C_new(i1). There's no ReductionVars.
 
-
-      if (!a.getReductionVars().empty()) {
-        a = Assignment(a.getLhs(), a.getRhs(), Add());
-      } else {
-        a = Assignment(a.getLhs(), a.getRhs());
-      }
-
+      IndexSetRel rel = a.getIndexSetRel();
+        switch (rel) {
+            case none: a = Assignment(a.getLhs(), a.getRhs());break; // =
+            case rcl:  a = Assignment(a.getLhs(), a.getRhs(), Add());break; // +=
+            case lcr: a = Assignment(a.getLhs(), a.getRhs());break; // =
+            case inter: a = Assignment(a.getLhs(), a.getRhs(), Add());break; // +=
+            case equal: a = Assignment(a.getLhs(), a.getRhs());break;//return RVars;//reductionVars.clear(); return reductionVars;//return RVars;// // = OR +=
+        }
       cout<<"Consumer Assignment return: "<<a<<endl;
       return a;
     }
@@ -501,49 +502,68 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
 
         std::vector<Assignment>& to_change;
         std::vector<IndexVar> ctx_stack;
+        std::vector<int> num_stack;
         int ctx_num;
-        bool in_where;
         const ProvenanceGraph& provGraph;
 
-        RedundentVisitor(std::vector<Assignment>& to_change, const ProvenanceGraph& provGraph):to_change(to_change), provGraph(provGraph),ctx_num(0),in_where(false) {}
+        RedundentVisitor(std::vector<Assignment>& to_change, const ProvenanceGraph& provGraph):to_change(to_change), provGraph(provGraph),ctx_num(0){}
 
         void visit(const ForallNode* node) {
             Forall foralli(node);
+            cout<<"Current Forall: "<<foralli<<endl;
             IndexVar var = foralli.getIndexVar();
             ctx_stack.push_back(var);
-            if (in_where) {
+            if (! num_stack.empty()) {
+                num_stack.back()++;
                 ctx_num++;
             }
-            cout<<"ctx_num: "<<ctx_num<<endl;
+            cout<<"ctx_stack: ";
+            for (auto& v: ctx_stack){
+                cout<<"("<<v<<","<<provGraph.getUnderivedAncestors(v)[0]<<")"<<" , ";
+            }
+            cout<<endl;
             IndexNotationVisitor::visit(node);
         }
         void visit(const WhereNode* node) {
-            in_where = true;
+            num_stack.push_back(0);
+            cout<<"Current where: "<<Where(node)<<endl;
             IndexNotationVisitor::visit(node->consumer);
+            ctx_num = num_stack.back();
+            cout<<"ctx_num: "<<ctx_num<<endl;
             for (int i = 0; i < ctx_num; i++){
                 ctx_stack.pop_back();
             }
-            ctx_num = 0;
+            num_stack.pop_back();
+            cout<<"ctx_stack: ";
+            for (auto& v: ctx_stack){
+                cout<<"("<<v<<","<<provGraph.getUnderivedAncestors(v)[0]<<")"<<" , ";
+            }
+            cout<<endl;
+            num_stack.push_back(0);
             IndexNotationVisitor::visit(node->producer);
+            ctx_num = num_stack.back();
+            cout<<"ctx_num: "<<ctx_num<<endl;
             for (int i = 0; i < ctx_num; i++){
                 ctx_stack.pop_back();
             }
-            ctx_num = 0;
-            in_where = false;
-            IndexNotationVisitor::visit(node);
+            num_stack.pop_back();
+            cout<<"ctx_stack: ";
+            for (auto& v: ctx_stack){
+                cout<<"("<<v<<","<<provGraph.getUnderivedAncestors(v)[0]<<")"<<" , ";
+            }
+            cout<<endl;
         }
         void visit(const AssignmentNode* node) {
+            cout<<"Assignment: "<<Assignment(node)<<endl;
             Assignment a(node->lhs, node->rhs, node->op);
             vector<IndexVar> freeVars = a.getLhs().getIndexVars();
             set<IndexVar> seen(freeVars.begin(), freeVars.end());
-            vector<IndexVar> RVars;
             bool has_sibling = false;
             match(a.getRhs(),
                   std::function<void(const AccessNode*)>([&](const AccessNode* op) {
                       for (auto& var : op->indexVars) {
-                          RVars.push_back(var);
                           for (auto& svar : ctx_stack) {
-                              if (provGraph.getUnderivedAncestors(var)[0] == provGraph.getUnderivedAncestors(svar)[0]) {
+                              if ((provGraph.getUnderivedAncestors(var)[0] == provGraph.getUnderivedAncestors(svar)[0]) && svar != var) {
                                   has_sibling = true;
                               }
                           }
@@ -554,27 +574,12 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
                 cout<<"("<<v<<","<<provGraph.getUnderivedAncestors(v)[0]<<")"<<" , ";
             }
             cout<<endl;
-            set<IndexVar> rseen(RVars.begin(), RVars.end());
-            std::vector<IndexVar> v_inter;
-            int lnum = seen.size();
-            int rnum = rseen.size();
-            int rcl_num = 0;
-            bool is_equal = false;
-            for (auto & var : rseen){
-                if (util::contains(seen, var)) {
-                    rcl_num += 1;
-                }
-            }
-            if ((rcl_num == lnum) && (rcl_num == rnum)) {
-                is_equal = true;
-            } else {
-                is_equal = false;
-            }
+            bool is_equal = (a.getIndexSetRel() == equal);
 
             if (is_equal && has_sibling) {
                 to_change.push_back(a);
             }
-            IndexNotationVisitor::visit(node);
+            //IndexNotationVisitor::visit(node);
         }
     };
 

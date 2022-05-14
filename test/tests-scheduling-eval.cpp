@@ -711,16 +711,16 @@ TEST_P(spgemm, scheduling_eval) {
   expected.compute();
   ASSERT_TENSOR_EQ(expected, C);
 }
-/*
+
 INSTANTIATE_TEST_CASE_P(spgemm, spgemm,
                         Values(std::make_tuple(CSR, CSR, true),
                                std::make_tuple(DCSR, CSR, true),
                                std::make_tuple(DCSR, DCSR, true),
                                std::make_tuple(CSR, CSC, false),
                                std::make_tuple(DCSR, DCSC, false)));
-                               */
-INSTANTIATE_TEST_CASE_P(spgemm, spgemm,
-                        Values(std::make_tuple(CSR, CSR, true)));
+
+//INSTANTIATE_TEST_CASE_P(spgemm, spgemm,
+//                        Values(std::make_tuple(CSR, CSR, true)));
 
 TEST(scheduling_eval, spmataddCPU) {
   if (should_use_CUDA_codegen()) {
