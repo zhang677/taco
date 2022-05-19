@@ -310,7 +310,7 @@ struct ReplaceRewriter : public IndexNotationRewriter {
   }
 
   void visit(const AddNode* op) {
-
+/*
       do {
   IndexExpr e = op;
   cout<<"exprSubstitutions: ";
@@ -323,18 +323,33 @@ struct ReplaceRewriter : public IndexNotationRewriter {
     }
   }
   cout<<"e: "<<e<<endl;
-  /// precompute_find equals as the cmp
-  //if (std::find(exprSubstitutions.begin(),exprSubstitutions.end(),e) != exprSubstitutions.end()) {
-  //if(exprSubstitutions.find(e)!=exprSubstitutions.end()){
-      //if (util::contains(exprSubstitutions,e)){
   if (_contains){
     cout<<"Detect! "<<endl;
-    expr = exprSubstitutions.at(find_key);
+    expr = exprSubstitutions.at(e);
   }
   else {
     IndexNotationRewriter::visit(op);
   }
 } while(false);
+*/
+    do {
+        IndexExpr e = op;
+        bool _contains = false;
+        IndexExpr find_key = op;
+        for(auto& i: exprSubstitutions) {
+            if (e == i.first) {
+                find_key = i.first;
+                _contains = true;
+                break;
+            }
+        }
+        if (_contains){
+            expr = exprSubstitutions.at(find_key);
+        }
+        else {
+            IndexNotationRewriter::visit(op);
+        }
+    } while(false);
   }
 
   void visit(const SubNode* op) {

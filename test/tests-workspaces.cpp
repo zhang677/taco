@@ -837,7 +837,7 @@ namespace Temptest {
         //GENGHAN:i1temp has the same name as i1
         //        forall(i0, forall(i1, A() += B(i) * C(i))) -->
         //        forall(i0, where(forall(i1, A() += ws(i1)), forall(i1, ws(i1) += B(i) * C(i))))
-        //        Use the hack part in transformations.cpp
+        //        No need to use the hack part in transformations.cpp now
 
         int N = 1024;
         Tensor<double> A("A");
@@ -885,7 +885,7 @@ namespace Temptest {
         //GENGHAN:i1temp has different name with i1
         //        forall(i0, forall(i1, A() += B(i) * C(i))) -->
         //        forall(i0, where(forall(i1, A() += ws(i1)), forall(i1, ws(i1) += B(i) * C(i))))
-        //        Use the hack part in transformations.cpp
+        //        No need to use the hack part in transformations.cpp now
 
         int N = 1024;
         Tensor<double> A("A");
@@ -928,7 +928,7 @@ namespace Temptest {
         ASSERT_TENSOR_EQ(expected, A);
     }
 
-    TEST(workspaces, DISABLED_chain_rule_fail_1) {
+    TEST(workspaces, chain_rule_fail_1) {
         /// From workspace paper: If S2 modifies its tensor with an assignment statement, then (Any S1) where (Any S2) is equivalent with Any(S1 where S2)
         /// FIXME: use of undeclared identifier 'jws1'
 
