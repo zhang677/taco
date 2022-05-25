@@ -250,6 +250,7 @@ void IndexNotationRewriter::visit(const SuchThatNode* op) {
 
 
 // Functions
+/*
 #define SUBSTITUTE_EXPR                        \
 do {                                           \
   IndexExpr e = op;                            \
@@ -266,10 +267,38 @@ do {                                           \
     IndexNotationRewriter::visit(op);          \
   }                                            \
 } while(false)
+*/
+
+#define SUBSTITUTE_EXPR             \
+    do {                            \
+    IndexExpr e = op;               \
+      cout<<"exprSubstitutions: ";                  \
+  for (auto& i: exprSubstitutions){            \
+    cout<<i.first<<"->"<<i.second<<endl;                \
+  }                                             \
+  cout<<"e: "<<e<<endl; \
+    bool _contains = false;         \
+    IndexExpr find_key = op;        \
+    for(auto& i: exprSubstitutions) {   \
+    if (e == i.first) {             \
+    find_key = i.first;             \
+    _contains = true;               \
+    break;                          \
+}                                   \
+}                                   \
+if (_contains){                     \
+cout<<"Detect! "<<endl;             \
+expr = exprSubstitutions.at(find_key);      \
+}                                   \
+else {                              \
+IndexNotationRewriter::visit(op);   \
+}                                   \
+} while(false)
 
 #define SUBSTITUTE_STMT                        \
 do {                                           \
   IndexStmt s = op;                            \
+  cout<<"Match Stmt: "<<s<<endl;                \
   if (util::contains(stmtSubstitutions, s)) {  \
     stmt = stmtSubstitutions.at(s);            \
   }                                            \

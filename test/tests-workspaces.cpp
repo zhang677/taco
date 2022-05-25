@@ -229,52 +229,6 @@ namespace Temptest {
 
     }
 
-    TEST(workspaces, precompute2D_add) {
-        /// GENGHAN: Target is forall(i, forall(j, A(i,j) = D(i,j))
-
-        int N = 16;
-        Tensor<double> A("A", {N, N}, Format{Dense, Dense});
-        Tensor<double> B("B", {N, N}, Format{Dense, Dense});
-        Tensor<double> C("C", {N, N}, Format{Dense, Dense});
-        Tensor<double> D("D", {N, N}, Format{Dense, Dense});
-        Tensor<double> E("E", {N, N}, Format{Dense, Dense});
-
-        for (int i = 0; i < N; i++) {
-            for (int j = 0; j < N; j++) {
-                B.insert({i, j}, (double) i);
-                C.insert({i, j}, (double) j);
-                D.insert({i, j}, (double) i * j);
-                E.insert({i,j}, (double) i * j);
-            }
-        }
-
-        IndexVar i("i"), j("j");
-        IndexExpr precomputedExpr = B(i, j) + C(i, j);
-        A(i, j) = precomputedExpr + D(i, j) + E(i,j);
-        TensorVar ws1("ws1", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
-        TensorVar ws2("ws2", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
-        TensorVar ws3("ws3", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
-
-        IndexStmt stmt = A.getAssignment().concretize();
-        stmt = stmt.precompute(precomputedExpr, {i, j}, {i, j}, ws1);
-        stmt = stmt.precompute(ws1(i,j)+D(i,j), {i, j}, {i, j}, ws2);
-        stmt = stmt.precompute(ws2(i,j)+E(i,j), {i, j}, {i, j}, ws3);
-
-        A.compile(stmt.concretize());
-        A.assemble();
-        A.compute();
-
-
-
-        Tensor<double> expected("expected", {N, N}, Format{Dense, Dense});
-        expected(i, j) = B(i, j) + C(i, j) + D(i, j);
-        expected.compile();
-        expected.assemble();
-        expected.compute();
-        ASSERT_TENSOR_EQ(expected, A);
-        //_printToCout(stmt);
-
-    }
 
 
     TEST(workspaces, precompute4D_add) {
@@ -991,7 +945,7 @@ namespace Temptest {
 
     }
 
-    TEST(workspaces, chain_rule_fail_2) {
+    TEST(workspaces, chain_rule_2) {
         /// FIXME: The expression (ws1(i,j) + D(i,j)) is not in forall(i, forall(j, A(i,j) = B(i,j) + C(i,j) + D(i,j)))
 
         int N = 16;
@@ -1092,6 +1046,52 @@ namespace Temptest {
         //_printToCout(stmt);
     }
 
+    TEST(workspaces, precompute2D_fail_chain_add) {
+        /// GENGHAN: Target is forall(i, forall(j, A(i,j) = D(i,j))
+
+        int N = 16;
+        Tensor<double> A("A", {N, N}, Format{Dense, Dense});
+        Tensor<double> B("B", {N, N}, Format{Dense, Dense});
+        Tensor<double> C("C", {N, N}, Format{Dense, Dense});
+        Tensor<double> D("D", {N, N}, Format{Dense, Dense});
+        Tensor<double> E("E", {N, N}, Format{Dense, Dense});
+
+        for (int i = 0; i < N; i++) {
+            for (int j = 0; j < N; j++) {
+                B.insert({i, j}, (double) i);
+                C.insert({i, j}, (double) j);
+                D.insert({i, j}, (double) i * j);
+                E.insert({i,j}, (double) i * j);
+            }
+        }
+
+        IndexVar i("i"), j("j");
+        IndexExpr precomputedExpr = B(i, j) + C(i, j);
+        A(i, j) = precomputedExpr + D(i, j) + E(i,j);
+        TensorVar ws1("ws1", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
+        TensorVar ws2("ws2", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
+        TensorVar ws3("ws3", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
+
+        IndexStmt stmt = A.getAssignment().concretize();
+        stmt = stmt.precompute(precomputedExpr, {i, j}, {i, j}, ws1);
+        stmt = stmt.precompute(ws1(i,j)+D(i,j), {i, j}, {i, j}, ws2);
+        stmt = stmt.precompute(ws2(i,j)+E(i,j), {i, j}, {i, j}, ws3);
+
+        A.compile(stmt.concretize());
+        A.assemble();
+        A.compute();
+        _printToFile("fail_chain",stmt);
+
+
+        Tensor<double> expected("expected", {N, N}, Format{Dense, Dense});
+        expected(i, j) = B(i, j) + C(i, j) + D(i, j);
+        expected.compile();
+        expected.assemble();
+        expected.compute();
+        ASSERT_TENSOR_EQ(expected, A);
+        //_printToCout(stmt);
+
+    }
 
 
 
