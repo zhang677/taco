@@ -339,7 +339,7 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
 
       IndexSetRel rel = a.getIndexSetRel();
         switch (rel) {
-            case none: a = Assignment(a.getLhs(), a.getRhs(), Add());break; // +=
+            case none: a = Assignment(a.getLhs(), a.getRhs());break; // =
             case rcl:  a = Assignment(a.getLhs(), a.getRhs(), Add());break; // +=
             case lcr: a = Assignment(a.getLhs(), a.getRhs());break; // =
             case inter: a = Assignment(a.getLhs(), a.getRhs(), Add());break; // +=
@@ -355,11 +355,20 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
                                      const IndexExpr& e,
                                      map<IndexVar, IndexVar> substitutions) {
 
-      auto assignment = ws(iw_vars) = replace(e, substitutions);
-      if (!assignment.getReductionVars().empty())
-        assignment = Assignment(assignment.getLhs(), assignment.getRhs(), Add());
-        //cout<<"Producer Assignment return: "<<assignment<<endl;
-      return assignment;
+      auto a = ws(iw_vars) = replace(e, substitutions);
+        IndexSetRel rel = a.getIndexSetRel();
+        switch (rel) {
+            case none: a = Assignment(a.getLhs(), a.getRhs());break; // =
+            case rcl:  a = Assignment(a.getLhs(), a.getRhs(), Add());break; // +=
+            case lcr: a = Assignment(a.getLhs(), a.getRhs());break; // =
+            case inter: a = Assignment(a.getLhs(), a.getRhs(), Add());break; // +=
+            case equal: a = Assignment(a.getLhs(), a.getRhs());break;//return RVars;//reductionVars.clear(); return reductionVars;//return RVars;// // = OR +=
+        }
+        // auto assignment = ws(iw_vars) = replace(e, substitutions);
+      //if (!assignment.getReductionVars().empty())
+      //  assignment = Assignment(assignment.getLhs(), assignment.getRhs(), Add());
+        cout<<"Producer Assignment return: "<<a<<endl;
+      return a;
     }
 
     IndexStmt generateForalls(IndexStmt stmt, vector<IndexVar> indexVars) {
@@ -522,6 +531,8 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
                 cout<<"("<<v<<","<<provGraph.getUnderivedAncestors(v)[0]<<")"<<" , ";
             }
             cout<<endl;
+            ctx_num = num_stack.back();
+            cout<<"ctx_num: "<<ctx_num<<endl;
             IndexNotationVisitor::visit(node);
         }
         void visit(const WhereNode* node) {
@@ -574,9 +585,24 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
                 cout<<"("<<v<<","<<provGraph.getUnderivedAncestors(v)[0]<<")"<<" , ";
             }
             cout<<endl;
+            ctx_num = num_stack.back();
+            cout<<"ctx_num: "<<ctx_num<<endl;
             bool is_equal = (a.getIndexSetRel() == equal);
-
+            bool is_none = (a.getIndexSetRel() == none);
             if (is_equal && has_sibling) {
+                to_change.push_back(a);
+            }
+            if (is_none && has_sibling && ctx_num > 1) {
+                to_change.push_back(a);
+            }
+            bool has_outside = false;
+            for (auto & var : seen) {
+                if (var!=ctx_stack.back()){
+                    has_outside = true;
+                    break;
+                }
+            }
+            if (is_none && has_sibling && ctx_num == 1 && has_outside) {
                 to_change.push_back(a);
             }
             //IndexNotationVisitor::visit(node);
