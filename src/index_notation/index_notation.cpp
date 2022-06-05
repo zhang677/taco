@@ -1836,7 +1836,8 @@ IndexStmt IndexStmt::split(IndexVar i, IndexVar i1, IndexVar i2, size_t splitFac
   }
 
   // Replace all occurrences of i with nested i1, i2
-  transformed = Transformation(ForAllReplace({i}, {i1, i2})).apply(transformed, &reason);
+  //transformed = Transformation(ForAllReplace({i}, {i1, i2})).apply(transformed, &reason);
+    transformed = Transformation(OneForallReplace({i}, {i1, i2})).apply(transformed, &reason);
   if (!transformed.defined()) {
     taco_uerror << reason;
   }

@@ -42,6 +42,10 @@ Transformation::Transformation(AddSuchThatPredicates addsuchthatpredicates)
         : transformation(new AddSuchThatPredicates(addsuchthatpredicates)) {
 }
 
+Transformation::Transformation(OneForallReplace forallreplace)
+            : transformation(new OneForallReplace(forallreplace)) {
+}
+
 IndexStmt Transformation::apply(IndexStmt stmt, string* reason) const {
   return transformation->apply(stmt, reason);
 }
@@ -526,6 +530,9 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
                 num_stack.back()++;
                 ctx_num++;
             }
+            if (num_stack.empty()) {
+                num_stack.push_back(1);
+            }
             cout<<"ctx_stack: ";
             for (auto& v: ctx_stack){
                 cout<<"("<<v<<","<<provGraph.getUnderivedAncestors(v)[0]<<")"<<" , ";
@@ -592,19 +599,23 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
             if (is_equal && has_sibling) {
                 to_change.push_back(a);
             }
+            /*
             if (is_none && has_sibling && ctx_num > 1) {
                 to_change.push_back(a);
             }
-            bool has_outside = false;
+            */
+            bool has_outside = true;
             for (auto & var : seen) {
-                if (var!=ctx_stack.back()){
-                    has_outside = true;
-                    break;
+                for (auto &svar: ctx_stack) {
+                    if (svar != ctx_stack.back() && var != svar) {
+                        has_outside = false;
+                    }
                 }
             }
-            if (is_none && has_sibling && ctx_num == 1 && has_outside) {
+            if (is_none && has_outside) {
                 to_change.push_back(a);
             }
+
             //IndexNotationVisitor::visit(node);
         }
     };
@@ -2070,4 +2081,76 @@ IndexStmt insertTemporaries(IndexStmt stmt)
   return stmt;
 }
 
+struct OneForallReplace::Content {
+    IndexVar pattern;
+    std::vector<IndexVar> replacement;
+};
+OneForallReplace::OneForallReplace() : content(nullptr) {
+}
+OneForallReplace::OneForallReplace(IndexVar pattern, std::vector<IndexVar> replacement) : content(new Content) {
+    taco_iassert(!pattern.empty());
+    content->pattern = pattern;
+    content->replacement = replacement;
+}
+IndexVar OneForallReplace::getPattern() const {
+    return content->pattern;
+}
+
+std::vector<IndexVar> OneForallReplace::getReplacement() const {
+    return content->replacement;
+}
+
+void OneForallReplace::print(std::ostream& os) const {
+    os << "Oneforallreplace(" << getPattern() << ", " << util::join(getReplacement()) << ")";
+}
+
+std::ostream& operator<<(std::ostream& os, const OneForallReplace& forallreplace) {
+    forallreplace.print(os);
+    return os;
+}
+
+IndexStmt OneForallReplace::apply(IndexStmt stmt, string* reason) const {
+    INIT_REASON(reason);
+
+    string r;
+    if (!isConcreteNotation(stmt, &r)) {
+        *reason = "The index statement is not valid concrete index notation: " + r;
+        return IndexStmt();
+    }
+    struct ForAllReplaceRewriter : public IndexNotationRewriter {
+        using IndexNotationRewriter::visit;
+        OneForallReplace transformation;
+        string *reason;
+
+        ForAllReplaceRewriter(OneForallReplace transformation, string *reason) : transformation(transformation),
+                                                                                 reason(reason) {}
+
+        IndexStmt forallreplace(IndexStmt stmt) {
+            IndexStmt replaced = rewrite(stmt);
+            // Precondition: Did not find pattern
+            vector<IndexVar> patterns;
+            patterns.push_back(transformation.getPattern());
+            if (replaced == stmt) {
+                *reason = "The pattern of ForAlls: " +
+                        util::join(patterns)+
+                          " was not found while attempting to replace with: " +
+                          util::join(transformation.getReplacement());
+                return IndexStmt();
+            }
+            return replaced;
+        }
+
+        void visit(const ForallNode *node) {
+            Forall foralli(node);
+            IndexVar pattern = transformation.getPattern();
+            vector<IndexVar> replacement = transformation.getReplacement();
+            if (pattern == foralli.getIndexVar()) {
+                for (auto i = replacement.rbegin(); i != replacement.rend(); ++i) {
+                    stmt = forall(*i, stmt); // Wrong, because we have to rewrite its content and change the indexVar
+                }
+            }
+        }
+    };
+    return ForAllReplaceRewriter(*this, reason).forallreplace(stmt);
+  }
 }

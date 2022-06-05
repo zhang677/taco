@@ -22,6 +22,7 @@ class AddSuchThatPredicates;
 class Parallelize;
 class TopoReorder;
 class SetAssembleStrategy;
+class OneForallReplace;
 
 /// A transformation is an optimization that transforms a statement in the
 /// concrete index notation into a new statement that computes the same result
@@ -36,6 +37,7 @@ public:
   Transformation(TopoReorder);
   Transformation(AddSuchThatPredicates);
   Transformation(SetAssembleStrategy);
+  Transformation(OneForallReplace);
 
   IndexStmt apply(IndexStmt stmt, std::string *reason = nullptr) const;
 
@@ -136,6 +138,28 @@ private:
 
 /// Print a ForAllReplace command.
 std::ostream &operator<<(std::ostream &, const ForAllReplace &);
+
+class OneForallReplace : public TransformationInterface {
+public:
+    OneForallReplace();
+
+    OneForallReplace(IndexVar pattern, std::vector<IndexVar> replacement);
+
+    IndexVar getPattern() const;
+
+    std::vector<IndexVar> getReplacement() const;
+
+    IndexStmt apply(IndexStmt stmt, std::string *reason = nullptr) const;
+
+    void print(std::ostream &os) const;
+
+private:
+    struct Content;
+    std::shared_ptr<Content> content;
+};
+
+/// Print a ForAllReplace command.
+std::ostream &operator<<(std::ostream &, const OneForallReplace &);
 
 
 /// Adds a SuchThat node if it does not exist and adds the given IndexVarRels
