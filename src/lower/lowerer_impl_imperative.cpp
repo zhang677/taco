@@ -2222,7 +2222,6 @@ namespace taco {
 //       the sort. CUB support is built into CUDA 11 but not prior versions of
 //       CUDA so in that case, we'd probably need to include the CUB headers in
 //       the generated code.
-//std::pair<bool,bool> LowererImplImperative::canAccelerateDenseTemp(Where where) { return std::make_pair(true, true);}
 
     std::pair<bool,bool> LowererImplImperative::canAccelerateDenseTemp(Where where) {
         // TODO: TEMPORARY -- Needs to be removed
@@ -2232,7 +2231,7 @@ namespace taco {
 
         TensorVar temporary = where.getTemporary();
         // (1) Temporary is dense vector
-        if(!isDense(temporary.getFormat()) || temporary.getOrder() != 1) {
+        if(isDense(temporary.getFormat()) || temporary.getOrder() != 1) {
             return std::make_pair(false, false);
         }
 
@@ -2250,10 +2249,10 @@ namespace taco {
 
         // No check for size of tempVar since we enforced the temporary is a vector
         // and if there is only one RHS value, it must (should?) be the temporary
-        std::vector<IndexVar> tempVar = inputAccesses[0].getIndexVars();
+        std::vector<IndexVar> tempVar = inputAccesses[0].getIndexVars(); // i
 
         // Get index vars in result.
-        std::vector<IndexVar> resultVars = resultAccesses[0].getIndexVars();
+        std::vector<IndexVar> resultVars = resultAccesses[0].getIndexVars(); // {}
         auto it = std::find_if(resultVars.begin(), resultVars.end(),
                                [&](const auto& resultVar) {
                                    return resultVar == tempVar[0] ||
@@ -2280,8 +2279,6 @@ namespace taco {
 // Code to initialize the local temporary workspace from the shared workspace
 // in codeToInitializeTemporaryParallel for a SINGLE parallel unit
 // (e.g.) the local workspace that each thread uses
-//vector<Stmt> LowererImplImperative::codeToInitializeLocalTemporaryParallel(Where where, ParallelUnit parallelUnit) { vector<Stmt> decls; return decls; }
-
     vector<Stmt> LowererImplImperative::codeToInitializeLocalTemporaryParallel(Where where, ParallelUnit parallelUnit) {
         TensorVar temporary = where.getTemporary();
         vector<Stmt> decls;
@@ -2350,8 +2347,6 @@ namespace taco {
 // Code to initialize a temporary workspace that is SHARED across ALL parallel units.
 // New temporaries are denoted by temporary.getName() + '_all'
 // Currently only supports CPUThreads
-//vector<Stmt> LowererImplImperative::codeToInitializeTemporaryParallel(Where where, ParallelUnit parallelUnit) { vector<Stmt> decl; return decl;}
-
     vector<Stmt> LowererImplImperative::codeToInitializeTemporaryParallel(Where where, ParallelUnit parallelUnit) {
         TensorVar temporary = where.getTemporary();
         // For the parallel case, need to hoist up a workspace shared by all threads

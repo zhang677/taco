@@ -581,7 +581,7 @@ namespace Temptest {
         // FIXME: This is also currently disabled since split(...) scheduling commands
 
         int N = 1024;
-        Tensor<double> A("A");
+        Tensor<float> A("A");
         /*
         Tensor<double> B("B", {N}, Format{Sparse});
         Tensor<double> C("C", {N}, Format{Sparse});
@@ -597,13 +597,14 @@ namespace Temptest {
                 C.insert({i}, (double) i);
             }
         }
-         */
-        Tensor<double> B("B", {N}, Format({Dense}));
-        Tensor<double> C("C", {N}, Format({Dense}));
+        */
+
+        Tensor<float> B("B", {N}, Format({Dense}));
+        Tensor<float> C("C", {N}, Format({Dense}));
 
         for (int i = 0; i < N; i++) {
-            B.insert({i}, (double) i);
-            C.insert({i}, (double) i);
+            B.insert({i}, (float) i);
+            C.insert({i}, (float) i);
         }
 
         B.pack();
@@ -618,26 +619,25 @@ namespace Temptest {
         A() = precomputedExpr;
 
         IndexStmt stmt = A.getAssignment().concretize();
-        TensorVar B_new("B_new", Type(Float64, {(size_t)N}), taco::dense);
-        TensorVar C_new("C_new", Type(Float64, {(size_t)N}), taco::dense);
-        TensorVar precomputed("precomputed", Type(Float64, {(size_t)N}), taco::dense);
+        TensorVar B_new("B_new", Type(Float32, {(size_t)N}), taco::dense);
+        TensorVar C_new("C_new", Type(Float32, {(size_t)N}), taco::dense);
+        TensorVar precomputed("ws", Type(Float32, {(size_t)N}), taco::dense);
 
         stmt = stmt.precompute(precomputedExpr, i, i, precomputed);
 
         stmt = stmt.precompute(BExpr, i, i, B_new)
                 .precompute(CExpr, i, i, C_new);
 
-        stmt = stmt.bound(i, i_bounded, (size_t)N, BoundType::MaxExact)
-                .split(i_bounded, i0, i1, 32);
+        stmt = stmt.bound(i, i_bounded, (size_t)N, BoundType::MaxExact).split(i_bounded, i0, i1, 32);
+        //stmt = stmt.split(i, i0, i1, 32);
 
         stmt = stmt.concretize();
-        cout<<stmt<<endl;
         A.compile(stmt);
         A.assemble();
         A.compute();
 
 
-
+        _printToFile("fail_split",stmt);
         Tensor<double> expected("expected");
         expected() = B(i) * C(i);
         expected.compile();
@@ -1171,6 +1171,38 @@ namespace Temptest {
         expected.compute();
         ASSERT_TENSOR_EQ(expected, A);
         //_printToCout(stmt);
+    }
+
+    TEST(workspaces, multiple_fuse) {
+        int N = 16;
+        Tensor<double> A("A", {N, N}, Format{Dense, Dense});
+        Tensor<double> B("B", {N, N}, Format{Dense, Dense});
+        Tensor<double> C("C", {N, N}, Format{Dense, Dense});
+        IndexVar i("i"), j("j"), k("k");
+        C(i,j) = A(i,j) + B(i,j);
+        TensorVar ws("ws", Type(Float64, {(size_t) N, (size_t) N}), Format{Dense, Dense});
+        IndexStmt stmt = where(forall(i,
+                                      forall(j,
+                                             C(i,j) = A(i,j) + ws(i,j))),
+                               forall(i,
+                                      forall(j,
+                                             ws(i,j) = B(i,j))));
+        stmt = stmt.fuse(i,j,k);
+        //stmt = stmt.fuse(i,j,k);
+        //stmt = stmt.fuse(i,j,k);
+        cout<<stmt<<endl;
+        //stmt = stmt.concretize();
+        //cout<<stmt<<endl;
+        C.compile(stmt);
+        C.assemble();
+        C.compute();
+        _printToFile("fail_fuse",stmt);
+        Tensor<double> expected("expected", {N, N}, Format{Dense, Dense});
+        expected(i,j) = A(i,j) + B(i,j);
+        expected.compile();
+        expected.assemble();
+        expected.compute();
+        ASSERT_TENSOR_EQ(expected, C);
     }
 
     TEST(workspaces, precompute2D_chain_add) {

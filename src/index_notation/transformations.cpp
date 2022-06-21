@@ -720,7 +720,8 @@ IndexStmt ForAllReplace::apply(IndexStmt stmt, string* reason) const {
 
     IndexStmt forallreplace(IndexStmt stmt) {
       IndexStmt replaced = rewrite(stmt);
-
+      cout << "After replacement " <<endl;
+      cout << replaced << endl;
       // Precondition: Did not find pattern
       if (replaced == stmt || elementsMatched == -1) {
         *reason = "The pattern of ForAlls: " +
@@ -730,6 +731,31 @@ IndexStmt ForAllReplace::apply(IndexStmt stmt, string* reason) const {
         return IndexStmt();
       }
       return replaced;
+    }
+
+    IndexStmt multiforallreplace(IndexStmt stmt){
+        IndexStmt replaced = rewrite(stmt);
+        if (replaced == stmt || elementsMatched == -1) {
+            *reason = "The pattern of ForAlls: " +
+                      util::join(transformation.getPattern()) +
+                      " was not found while attempting to replace with: " +
+                      util::join(transformation.getReplacement());
+            return IndexStmt();
+        }
+        do {
+            cout<<"Enter: "<<endl;
+            stmt = replaced;
+            cout<<"stmt: "<<stmt<<endl;
+            elementsMatched = 0;
+            replaced = rewrite(stmt);
+            cout<<"elementsMatched: "<<elementsMatched<<endl;
+            cout<<"replaced: "<<replaced<<endl;
+
+            if (replaced == stmt || elementsMatched == -1) {
+                return stmt;
+            }
+        }while(elementsMatched != -1 && replaced!=stmt);
+        //return replaced;
     }
 
     void visit(const ForallNode* node) {
@@ -756,10 +782,13 @@ IndexStmt ForAllReplace::apply(IndexStmt stmt, string* reason) const {
         elementsMatched++;
         stmt = rewrite(foralli.getStmt());
         if (firstMatch) {
+            cout << "First match: " << foralli.getIndexVar() <<endl;
+            cout << stmt << " , "<< foralli << endl;
           // add replacement nodes and cut out this node
           for (auto i = replacement.rbegin(); i != replacement.rend(); ++i ) {
             stmt = forall(*i, stmt);
           }
+          cout << stmt << endl;
         }
         // else cut out this node
         return;
@@ -773,6 +802,7 @@ IndexStmt ForAllReplace::apply(IndexStmt stmt, string* reason) const {
     }
   };
   return ForAllReplaceRewriter(*this, reason).forallreplace(stmt);
+  //return ForAllReplaceRewriter(*this, reason).multiforallreplace(stmt);
 }
 
 void ForAllReplace::print(std::ostream& os) const {
@@ -2127,6 +2157,8 @@ IndexStmt OneForallReplace::apply(IndexStmt stmt, string* reason) const {
 
         IndexStmt forallreplace(IndexStmt stmt) {
             IndexStmt replaced = rewrite(stmt);
+            cout << "After replacement " <<endl;
+            cout << replaced << endl;
             // Precondition: Did not find pattern
             vector<IndexVar> patterns;
             patterns.push_back(transformation.getPattern());
@@ -2145,10 +2177,18 @@ IndexStmt OneForallReplace::apply(IndexStmt stmt, string* reason) const {
             IndexVar pattern = transformation.getPattern();
             vector<IndexVar> replacement = transformation.getReplacement();
             if (pattern == foralli.getIndexVar()) {
+                cout<< "Pattern Matched !" <<endl;
+                cout<< stmt << endl;
+                stmt = rewrite(foralli.getStmt());
+                cout<< "Replacing: " << endl;
                 for (auto i = replacement.rbegin(); i != replacement.rend(); ++i) {
+                    cout<< *i << endl;
                     stmt = forall(*i, stmt); // Wrong, because we have to rewrite its content and change the indexVar
+                    cout<< stmt << endl;
                 }
+                return;
             }
+            IndexNotationRewriter::visit(node);
         }
     };
     return ForAllReplaceRewriter(*this, reason).forallreplace(stmt);
