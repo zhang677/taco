@@ -1991,8 +1991,8 @@ IndexStmt IndexStmt::fuse(IndexVar i, IndexVar j, IndexVar f) const {
   }
 
   // Replace all occurrences of i, j with f
-  //transformed = Transformation(ForAllReplace({i,j}, {f})).apply(transformed, &reason);
-  transformed = Transformation(MultiForallReplace({i,j}, {f})).apply(transformed, &reason);
+  transformed = Transformation(ForAllReplace({i,j}, {f})).apply(transformed, &reason);
+  //transformed = Transformation(MultiForallReplace({i,j}, {f})).apply(transformed, &reason);
   if (!transformed.defined()) {
     taco_uerror << reason;
   }

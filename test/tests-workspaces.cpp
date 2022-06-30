@@ -11,6 +11,8 @@
 using namespace taco;
 
 namespace Temptest {
+#define DType float
+
     void _printIRtoFile(const string& filename, const IndexStmt& stmt) {
         stringstream source;
         string file_path = "eval_generated/";
@@ -632,6 +634,7 @@ namespace Temptest {
         //stmt = stmt.split(i, i0, i1, 32);
 
         stmt = stmt.concretize();
+        cout<<stmt<<endl;
         A.compile(stmt);
         A.assemble();
         A.compute();
@@ -1252,6 +1255,70 @@ namespace Temptest {
 
     }
 
+    TEST(workspaces, acceleration_test_1) {
+        int N = 16;
+        Tensor<double> A("A");
+        Tensor<double> B("B", {N}, Format{Sparse});
+        Tensor<double> C("C", {N}, Format{Sparse});
+        for (int i=0; i<N ; ++i) {
+            if ((i & 1) == 0){
+                B.insert({i}, 1.0);
+                C.insert({i}, 1.0);
+            }
+        }
+        IndexVar i("i"), io("io"), ii("ii");
+        IndexExpr precomputeExpr = B(i) * C(i);
+        A() = precomputeExpr;
+        TensorVar ws("ws", Type(Float64, {(size_t) N}), Format{Dense});
+        IndexStmt stmt = A.getAssignment().concretize();
+        stmt = stmt.precompute(precomputeExpr, {i}, {i}, ws)
+                .split(i, io, ii, 4);
+        A.compile(stmt.concretize());
+        A.assemble();
+        A.compute();
+        cout<<stmt<<endl;
+        _printToCout(stmt);
+
+        Tensor<double> expected("expected");
+        expected() = B(i) * C(i);
+        expected.compile();
+        expected.assemble();
+        expected.compute();
+        ASSERT_TENSOR_EQ(expected, A);
+    }
+
+    TEST(workspaces, acceleration_test_2) {
+        int N = 16;
+        Tensor<DType> A("A", {N}, Format{Sparse}); // sparse one dimension workspace
+        Tensor<DType> B("B", {N}, Format{Sparse}); //
+        Tensor<DType> C("C", {N}, Format{Sparse});
+        for (int i=0; i<N ; ++i) {
+            if ((i & 1) == 0){
+                B.insert({i}, 1.0f);
+                C.insert({i}, 1.0f);
+            }
+        }
+        IndexVar i("i"), io("io"), ii("ii");
+        IndexExpr precomputeExpr = B(i) * C(i);
+        A(i) = precomputeExpr;
+        TensorVar ws("ws", Type(Float32, {(size_t) N}), Format{Dense});
+        IndexStmt stmt = A.getAssignment().concretize();
+        stmt = stmt.precompute(precomputeExpr, {i}, {i}, ws);
+        stmt = stmt.split(i, io, ii, 4);
+        stmt = stmt.reorder({ii,io});
+        A.compile(stmt.concretize());
+        A.assemble();
+        A.compute();
+        cout<<stmt<<endl;
+        _printToFile("fail_pre", stmt);
+
+        Tensor<DType> expected("expected", {N}, Format{Sparse});
+        expected(i) = B(i) * C(i);
+        expected.compile();
+        expected.assemble();
+        expected.compute();
+        ASSERT_TENSOR_EQ(expected, A);
+    }
 
 
 }

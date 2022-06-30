@@ -45,6 +45,9 @@ namespace taco {
     Transformation::Transformation(OneForallReplace forallreplace)
             : transformation(new OneForallReplace(forallreplace)) {
     }
+    Transformation::Transformation(MultiForallReplace forallreplace)
+            : transformation(new MultiForallReplace(forallreplace)) {
+    }
 
     IndexStmt Transformation::apply(IndexStmt stmt, string *reason) const {
         return transformation->apply(stmt, reason);
@@ -785,6 +788,7 @@ namespace taco {
 
             void visit(const ForallNode *node) {
                 Forall foralli(node);
+                cout<<"Visit: "<<foralli<<"Matched: "<<elementsMatched<<endl;
                 vector<IndexVar> pattern = transformation.getPattern();
                 if (elementsMatched == -1) {
                     return; // pattern did not match
@@ -813,7 +817,7 @@ namespace taco {
                         for (auto i = replacement.rbegin(); i != replacement.rend(); ++i) {
                             stmt = forall(*i, stmt);
                         }
-                        cout << stmt << endl;
+                        elementsMatched = 0;
                     }
                     // else cut out this node
                     return;
@@ -823,6 +827,7 @@ namespace taco {
                 }
                 // before pattern match
                 IndexNotationRewriter::visit(node);
+
             }
         };
         return ForAllReplaceRewriter(*this, reason).forallreplace(stmt);
@@ -2277,13 +2282,12 @@ namespace taco {
             MultiForallReplace transformation;
             string *reason;
             int patternLength;
-            int currentMatch;
             vector<int> ctx_stack;
+            //int elementsMatched = 0;
 
 
             ForAllReplaceRewriter(MultiForallReplace transformation, string *reason) : transformation(transformation),
-                                                                                       reason(reason), patternLength(
-                            transformation.getPattern().size()), currentMatch(0) {}
+                                                                                       reason(reason),patternLength(transformation.getPattern().size()){}
 
             IndexStmt forallreplace(IndexStmt stmt) {
                 IndexStmt replaced = rewrite(stmt);
@@ -2299,9 +2303,60 @@ namespace taco {
                               util::join(replacement);
                     return IndexStmt();
                 }
+                /*
+                do {
+                    cout << "Enter: " << endl;
+                    stmt = replaced;
+                    cout << "stmt: " << stmt << endl;
+                    elementsMatched = 0;
+                    replaced = rewrite(stmt);
+                    cout << "elementsMatched: " << elementsMatched << endl;
+                    cout << "replaced: " << replaced << endl;
+                } while (elementsMatched != -1 && replaced != stmt);
+                 */
                 return replaced;
             }
+            /*
+            void visit(const ForallNode *node) {
+                Forall foralli(node);
+                vector<IndexVar> pattern = transformation.getPattern();
+                if (elementsMatched == -1) {
+                    return; // pattern did not match
+                }
 
+                if (elementsMatched >= (int) pattern.size()) {
+                    IndexNotationRewriter::visit(node);
+                    return;
+                }
+
+                if (foralli.getIndexVar() == pattern[elementsMatched]) {
+                    if (elementsMatched + 1 < (int) pattern.size() && !isa<Forall>(foralli.getStmt())) {
+                        // child is not a forallnode (not directly nested)
+                        elementsMatched = -1;
+                        return;
+                    }
+                    // assume rest of pattern matches
+                    IndexVar replacement = transformation.getReplacement();
+                    bool firstMatch = (elementsMatched == 0);
+                    elementsMatched++;
+                    stmt = rewrite(foralli.getStmt());
+                    if (firstMatch) {
+                        cout << "First match: " << foralli.getIndexVar() << endl;
+                        cout << stmt << " , " << foralli << endl;
+                        // add replacement nodes and cut out this node
+                        stmt = forall(replacement, stmt);
+                        cout << stmt << endl;
+                    }
+                    // else cut out this node
+                    return;
+                } else if (elementsMatched > 0) {
+                    elementsMatched = -1; // pattern did not match
+                    return;
+                }
+                // before pattern match
+                IndexNotationRewriter::visit(node);
+            }
+            */
             void visit(const ForallNode *node) {
                 Forall foralli(node);
                 IndexVar currentIndex = foralli.getIndexVar();
@@ -2345,6 +2400,7 @@ namespace taco {
                     ctx_stack.pop_back();
                 }
             }
+
         };
         return ForAllReplaceRewriter(*this, reason).forallreplace(stmt);
     }
