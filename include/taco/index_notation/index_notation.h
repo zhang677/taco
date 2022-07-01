@@ -762,7 +762,7 @@ public:
   ///
   /// Precondition:
   /// Workspace can be accessed by the IndexVars in the accels.
-  IndexStmt wsaccel(TensorVar& ws, const std::vector<IndexVar>& accels);
+  IndexStmt wsaccel(TensorVar& ws, const std::vector<IndexVar>& accels, bool Acc = true);
   /// Casts index statement to specified subtype.
   template <typename SubType>
   SubType as() {
@@ -1143,7 +1143,9 @@ public:
 
   const std::vector<IndexVar>& getAccels() const;
 
-  void setAccels(const std::vector<IndexVar>& accels);
+  bool getAcc() const;
+
+  void setAccels(const std::vector<IndexVar>& accels, bool Acc);
 
   /// Set the fill value of the tensor variable
   void setFill(const Literal& fill);

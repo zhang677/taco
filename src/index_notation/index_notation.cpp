@@ -2051,9 +2051,9 @@ IndexStmt IndexStmt::assemble(TensorVar result, AssembleStrategy strategy,
   return transformed;
 }
 
-IndexStmt IndexStmt::wsaccel(TensorVar& ws, const std::vector<IndexVar>& accels) {
+IndexStmt IndexStmt::wsaccel(TensorVar& ws, const std::vector<IndexVar>& accels, bool Acc) {
     if (accels.size() == 0) {
-        ws.setAccels(accels);
+        ws.setAccels(accels, Acc);
         return *this;
     }
     set<IndexVar> TempVars;
@@ -2071,7 +2071,7 @@ IndexStmt IndexStmt::wsaccel(TensorVar& ws, const std::vector<IndexVar>& accels)
             taco_uerror << "No matching indexVars in the Accel";
         }
     }
-    ws.setAccels(accels);
+    ws.setAccels(accels, Acc);
     return *this;
 }
 
@@ -2566,6 +2566,7 @@ struct TensorVar::Content {
   Schedule schedule;
   Literal fill;
   std::vector<IndexVar> accels;
+  bool Acc;
 };
 
 TensorVar::TensorVar() : content(nullptr) {
@@ -2599,6 +2600,7 @@ TensorVar::TensorVar(const int& id, const string& name, const Type& type, const 
   content->format = format;
   content->fill = fill.defined()? fill : Literal::zero(type.getDataType());
   content->accels = accels;
+  content->Acc = true;
 }
 
 int TensorVar::getId() const {
@@ -2645,7 +2647,13 @@ const Literal& TensorVar::getFill() const {
 const std::vector<IndexVar>& TensorVar::getAccels() const {
     return content->accels;
 }
-void TensorVar::setAccels(const std::vector<IndexVar>& accels) {
+
+bool TensorVar::getAcc() const {
+    return content->Acc;
+}
+
+void TensorVar::setAccels(const std::vector<IndexVar>& accels, bool Acc) {
+    content->Acc = Acc;
     content->accels = accels;
 }
 

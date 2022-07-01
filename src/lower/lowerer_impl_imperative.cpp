@@ -2230,7 +2230,7 @@ namespace taco {
         }
 
         TensorVar temporary = where.getTemporary();
-        if (temporary.getAccels().size() == 0) {
+        if (!temporary.getAcc()) {
             return std::make_pair(false, false);
         }
         // (1) Temporary is dense vector

@@ -631,7 +631,7 @@ namespace Temptest {
 
         stmt = stmt.bound(i, i_bounded, (size_t)N, BoundType::MaxExact).split(i_bounded, i0, i1, 32);
         //stmt = stmt.split(i, i0, i1, 32);
-        stmt = stmt.wsaccel(precomputed, {});
+        stmt = stmt.wsaccel(precomputed, {}, true);
         stmt = stmt.concretize();
         cout<<stmt<<endl;
         A.compile(stmt);
