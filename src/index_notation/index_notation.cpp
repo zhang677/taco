@@ -2051,6 +2051,30 @@ IndexStmt IndexStmt::assemble(TensorVar result, AssembleStrategy strategy,
   return transformed;
 }
 
+IndexStmt IndexStmt::wsaccel(TensorVar& ws, const std::vector<IndexVar>& accels) {
+    if (accels.size() == 0) {
+        ws.setAccels(accels);
+        return *this;
+    }
+    set<IndexVar> TempVars;
+    match(*this,
+          std::function<void(const WhereNode*)>([&](const WhereNode* where) {
+              auto Temp = getResultAccesses(where->producer).first[0];
+              if (Temp.getTensorVar() == ws) {
+                  for (auto i :getIndexVars()){
+                      TempVars.insert(i);
+                  }
+              }
+    }));
+    for (auto i : accels) {
+        if (TempVars.find(i) == TempVars.end()) {
+            taco_uerror << "No matching indexVars in the Accel";
+        }
+    }
+    ws.setAccels(accels);
+    return *this;
+}
+
 std::ostream& operator<<(std::ostream& os, const IndexStmt& expr) {
   if (!expr.defined()) return os << "IndexStmt()";
   IndexNotationPrinter printer(os);
@@ -2541,6 +2565,7 @@ struct TensorVar::Content {
   Format format;
   Schedule schedule;
   Literal fill;
+  std::vector<IndexVar> accels;
 };
 
 TensorVar::TensorVar() : content(nullptr) {
@@ -2555,24 +2580,25 @@ TensorVar::TensorVar(const Type& type, const Literal& fill)
 }
 
 TensorVar::TensorVar(const std::string& name, const Type& type, const Literal& fill)
-: TensorVar(-1, name, type, createDenseFormat(type), fill) {
+: TensorVar(-1, name, type, createDenseFormat(type), fill, std::vector<IndexVar> {}) {
 }
 
 TensorVar::TensorVar(const Type& type, const Format& format, const Literal& fill)
-    : TensorVar(-1, util::uniqueName('A'), type, format, fill) {
+    : TensorVar(-1, util::uniqueName('A'), type, format, fill, std::vector<IndexVar> {}) {
 }
 
 TensorVar::TensorVar(const string& name, const Type& type, const Format& format, const Literal& fill)
-    : TensorVar(-1, name, type, format, fill) {
+    : TensorVar(-1, name, type, format, fill, std::vector<IndexVar> {}) {
 }
 
-TensorVar::TensorVar(const int& id, const string& name, const Type& type, const Format& format, const Literal& fill)
+TensorVar::TensorVar(const int& id, const string& name, const Type& type, const Format& format, const Literal& fill, const std::vector<IndexVar>& accels)
     : content(new Content) {
   content->id = id;
   content->name = name;
   content->type = type;
   content->format = format;
   content->fill = fill.defined()? fill : Literal::zero(type.getDataType());
+  content->accels = accels;
 }
 
 int TensorVar::getId() const {
@@ -2614,6 +2640,13 @@ const Schedule& TensorVar::getSchedule() const {
 
 const Literal& TensorVar::getFill() const {
   return content->fill;
+}
+
+const std::vector<IndexVar>& TensorVar::getAccels() const {
+    return content->accels;
+}
+void TensorVar::setAccels(const std::vector<IndexVar>& accels) {
+    content->accels = accels;
 }
 
 void TensorVar::setFill(const Literal &fill) {

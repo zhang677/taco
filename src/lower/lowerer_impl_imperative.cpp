@@ -2230,6 +2230,9 @@ namespace taco {
         }
 
         TensorVar temporary = where.getTemporary();
+        if (temporary.getAccels().size() == 0) {
+            return std::make_pair(false, false);
+        }
         // (1) Temporary is dense vector
         if(!isDense(temporary.getFormat())|| temporary.getOrder() != 1) {
             return std::make_pair(false, false);
@@ -2258,9 +2261,6 @@ namespace taco {
                                    return resultVar == tempVar[0] ||
                                           provGraph.isDerivedFrom(tempVar[0], resultVar);
                                });
-        if (resultVars.size() == 0){
-            return std::make_pair(false, false);
-        }
         if (it == resultVars.end()) {
             return std::make_pair(true, false);
         }

@@ -268,7 +268,6 @@ namespace Temptest {
 
         stmt = stmt.precompute(precomputedExpr, {i, j, k, l}, {i, j, k, l}, ws1)
                 .precompute(ws1(i, j, k, l) + D(i, j, k, l), {i, j, k, l}, {iw, jw, kw, lw}, ws2);
-
         A.compile(stmt.concretize());
         A.assemble();
         A.compute();
@@ -632,7 +631,7 @@ namespace Temptest {
 
         stmt = stmt.bound(i, i_bounded, (size_t)N, BoundType::MaxExact).split(i_bounded, i0, i1, 32);
         //stmt = stmt.split(i, i0, i1, 32);
-
+        stmt = stmt.wsaccel(precomputed, {});
         stmt = stmt.concretize();
         cout<<stmt<<endl;
         A.compile(stmt);
