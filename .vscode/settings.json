@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "*.td": "mlir",
+        "vector": "cpp"
+    }
+}

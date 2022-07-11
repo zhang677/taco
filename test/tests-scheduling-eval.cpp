@@ -645,6 +645,7 @@ TEST_P(spgemm, scheduling_eval) {
   C.compile(stmt);
   C.assemble();
   C.compute();
+  printToFile("spgemm"+util::join(aFormat.getModeFormatPacks(),"_")+util::join(bFormat.getModeFormatPacks(),"_")+util::join(bFormat.getModeOrdering(),"_")+"_cpu",stmt);
 
   Tensor<double> expected("expected", {NUM_I, NUM_K}, {Dense, Dense});
   expected(i, k) = A(i, j) * B(j, k);
