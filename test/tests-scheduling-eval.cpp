@@ -28,7 +28,7 @@ void printToFile(string filename, IndexStmt stmt) {
   mkdir(file_path.c_str(), 0777);
 
   std::shared_ptr<ir::CodeGen> codegen = ir::CodeGen::init_default(source, ir::CodeGen::ImplementationGen);
-  ir::Stmt compute = lower(stmt, "compute",  true, true);
+  ir::Stmt compute = lower(stmt, "compute",  true, true, true, true);
   codegen->compile(compute, true);
 
   ofstream source_file;
@@ -154,7 +154,7 @@ IndexStmt scheduleTTMCPU(IndexStmt stmt, Tensor<double> B, int CHUNK_SIZE=16, in
 }
 
 IndexStmt scheduleMTTKRPCPU(IndexStmt stmt, Tensor<double> B, int CHUNK_SIZE=16, int UNROLL_FACTOR=8) {
-  int NUM_J = 1039/20;
+  int NUM_J = 100;
   IndexVar i1("i1"), i2("i2");
 
   IndexExpr precomputeExpr = stmt.as<Forall>().getStmt().as<Forall>().getStmt()
@@ -773,6 +773,8 @@ TEST(scheduling_eval, sptenaddCPU) {
   C.compile(stmt);
   C.assemble();
   C.compute();
+  std::cout<<stmt<<std::endl;
+  printToFile("sptenadd", stmt);
 
   eC(i, j, k) = eA(i, j, k) + eB(i, j, k);
   eC.compile();
@@ -1619,7 +1621,7 @@ TEST(scheduling_eval, indexVarSplit) {
   ASSERT_TENSOR_EQ(expected, a);
 }
 
-TEST(generate_evaluation_files, DISABLED_cpu) {
+TEST(generate_evaluation_files, cpu) {
   if (should_use_CUDA_codegen()) {
     return;
   }
