@@ -28,7 +28,7 @@ void printToFile(string filename, IndexStmt stmt) {
   mkdir(file_path.c_str(), 0777);
 
   std::shared_ptr<ir::CodeGen> codegen = ir::CodeGen::init_default(source, ir::CodeGen::ImplementationGen);
-  ir::Stmt compute = lower(stmt, "compute",  true, true, true, true);
+  ir::Stmt compute = lower(stmt, "compute",  true, true);
   codegen->compile(compute, true);
 
   ofstream source_file;
@@ -659,8 +659,8 @@ INSTANTIATE_TEST_CASE_P(spgemm, spgemm,
                         Values(std::make_tuple(CSR, CSR, true),
                                std::make_tuple(DCSR, CSR, true),
                                std::make_tuple(DCSR, DCSR, true),
-                               std::make_tuple(CSR, CSC, false),
-                               std::make_tuple(DCSR, DCSC, false)));
+                               std::make_tuple(CSR, CSC, true),
+                               std::make_tuple(DCSR, DCSC, true)));
 
 TEST(scheduling_eval, spmataddCPU) {
   if (should_use_CUDA_codegen()) {
