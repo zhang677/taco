@@ -28,14 +28,28 @@ void printToFile(string filename, IndexStmt stmt) {
   mkdir(file_path.c_str(), 0777);
 
   std::shared_ptr<ir::CodeGen> codegen = ir::CodeGen::init_default(source, ir::CodeGen::ImplementationGen);
-  ir::Stmt compute = lower(stmt, "compute",  true, true);
-  codegen->compile(compute, true);
+  //ir::Stmt evaluate = lower(stmt, "evaluate",  true, true); // false, true ; true, false
+  //codegen->compile(evaluate, true);
 
   ofstream source_file;
   string file_ending = should_use_CUDA_codegen() ? ".cu" : ".c";
-  source_file.open(file_path + filename + file_ending);
+  source_file.open(file_path + filename + file_ending, ios_base::out);
+
+    source.clear();
+    codegen->compile(lower(stmt, "assemble", true, false, true), false);
+    source_file << "\n";
+    source_file << source.str();
+
+  source.clear();
+  codegen->compile(lower(stmt, "compute", false, true), false);
+  source_file << "\n";
   source_file << source.str();
+
+
+
   source_file.close();
+
+
 }
 
 IndexStmt scheduleSpMVCPU(IndexStmt stmt, int CHUNK_SIZE=16) {
@@ -89,7 +103,7 @@ IndexStmt scheduleSpGEMMCPU(IndexStmt stmt, bool doPrecompute) {
                           OutputRaceStrategy::NoRaces)
              .parallelize(qi, ParallelUnit::CPUThread,
                           OutputRaceStrategy::NoRaces);
-
+  cout<<stmt<<endl;
   return stmt;
 }
 
@@ -612,16 +626,16 @@ TEST_P(spgemm, scheduling_eval) {
   int NUM_J = 100;
   int NUM_K = 100;
   float SPARSITY = .03;
-  Tensor<double> A("A", {NUM_I, NUM_J}, aFormat);
-  Tensor<double> B("B", {NUM_J, NUM_K}, bFormat);
-  Tensor<double> C("C", {NUM_I, NUM_K}, CSR);
+  Tensor<float> A("A", {NUM_I, NUM_J}, aFormat);
+  Tensor<float> B("B", {NUM_J, NUM_K}, bFormat);
+  Tensor<float> C("C", {NUM_I, NUM_K}, CSR);
 
   srand(75883);
   for (int i = 0; i < NUM_I; i++) {
     for (int j = 0; j < NUM_J; j++) {
       float rand_float = (float)rand()/(float)(RAND_MAX);
       if (rand_float < SPARSITY) {
-        A.insert({i, j}, (double) ((int) (rand_float*3/SPARSITY)));
+        A.insert({i, j}, (float ) ((int) (rand_float*3/SPARSITY)));
       }
     }
   }
@@ -630,7 +644,7 @@ TEST_P(spgemm, scheduling_eval) {
     for (int k = 0; k < NUM_K; k++) {
       float rand_float = (float)rand()/(float)(RAND_MAX);
       if (rand_float < SPARSITY) {
-        B.insert({j, k}, (double) ((int) (rand_float*3/SPARSITY)));
+        B.insert({j, k}, (float ) ((int) (rand_float*3/SPARSITY)));
       }
     }
   }
@@ -642,12 +656,13 @@ TEST_P(spgemm, scheduling_eval) {
   IndexStmt stmt = C.getAssignment().concretize();
   stmt = scheduleSpGEMMCPU(stmt, doPrecompute);
 
+  //C.setAssembleWhileCompute(true);
   C.compile(stmt);
   C.assemble();
   C.compute();
   printToFile("spgemm"+util::join(aFormat.getModeFormatPacks(),"_")+util::join(bFormat.getModeFormatPacks(),"_")+util::join(bFormat.getModeOrdering(),"_")+"_cpu",stmt);
 
-  Tensor<double> expected("expected", {NUM_I, NUM_K}, {Dense, Dense});
+  Tensor<float> expected("expected", {NUM_I, NUM_K}, {Dense, Dense});
   expected(i, k) = A(i, j) * B(j, k);
   expected.compile();
   expected.assemble();
@@ -659,8 +674,8 @@ INSTANTIATE_TEST_CASE_P(spgemm, spgemm,
                         Values(std::make_tuple(CSR, CSR, true),
                                std::make_tuple(DCSR, CSR, true),
                                std::make_tuple(DCSR, DCSR, true),
-                               std::make_tuple(CSR, CSC, true),
-                               std::make_tuple(DCSR, DCSC, true)));
+                               std::make_tuple(CSR, CSC, false),
+                               std::make_tuple(DCSR, DCSC, false)));
 
 TEST(scheduling_eval, spmataddCPU) {
   if (should_use_CUDA_codegen()) {

@@ -452,6 +452,7 @@ TEST(workspaces, tile_dotProduct_1) {
   Tensor<double> B("B", {N}, Format({Dense}));
   Tensor<double> C("C", {N}, Format({Dense}));
 
+  
   for (int i = 0; i < N; i++) {
     B.insert({i}, (double) i);
     C.insert({i}, (double) i);
@@ -550,7 +551,7 @@ TEST(workspaces, tile_dotProduct_2) {
   A.compile(stmt);
   A.assemble();
   A.compute();
-
+  cout<<stmt<<endl;
   Tensor<double> expected("expected");
   expected() = B(i) * C(i);
   expected.compile();
