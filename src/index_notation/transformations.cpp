@@ -1973,6 +1973,8 @@ IndexStmt insertTemporaries(IndexStmt stmt)
                            Type(A.getType().getDataType(),{}),
                            taco::dense);
         if (tag==0) {
+          // N = 128
+          /*
             stmt = stmt.reorder({i, j, k})
                     .fuse(i, j, f)
                     .pos(f, fpos, A(i, j))
@@ -1984,6 +1986,19 @@ IndexStmt insertTemporaries(IndexStmt stmt)
                     .parallelize(block, ParallelUnit::GPUBlock, OutputRaceStrategy::IgnoreRaces)
                     .parallelize(warp, ParallelUnit::GPUWarp, OutputRaceStrategy::IgnoreRaces)
                     .parallelize(thread, ParallelUnit::GPUThread, OutputRaceStrategy::Atomics);// .mypara(nnz, myattr);
+          */
+          // N = 4
+           stmt = stmt.reorder({i,j,k})
+                   .fuse(i,j,f)
+                   .pos(f, fpos, A(i,j))
+                   .split(fpos, block, fpos1, 2048)
+                   .split(fpos1, warp, nnz, 16)
+                   .split(k, ko, thread, 4)
+                   .reorder({block, warp, thread, ko, nnz})
+                   .bound(ko, dense_val, 1, BoundType::MaxExact)
+                   .parallelize(block, ParallelUnit::GPUBlock, OutputRaceStrategy::IgnoreRaces)
+                   .parallelize(warp, ParallelUnit::GPUWarp, OutputRaceStrategy::IgnoreRaces)
+                   .parallelize(thread, ParallelUnit::GPUThread, OutputRaceStrategy::Atomics);
         }
         else if (tag==1){
             IndexExpr AExpr = A(i,j);
@@ -1995,13 +2010,16 @@ IndexStmt insertTemporaries(IndexStmt stmt)
                           forall(j,
                                  forall(k,
                                         where(C(i,k)+=tmpVal,tmpVal = A(i,j)*B(j,k)))));
-
+            IndexVar ki("ki");
             //stmt = stmt.reorder({i, j, k})
             stmt = stmt.fuse(i, j, f)
                     .pos(f, fpos, A(i, j))
-                    .split(fpos, block, fpos1, 256)
-                    .reorder({block, k, fpos1})
+                    .split(fpos, block, fpos1, 128)
+                    .split(k,dense_val,ki,2)
+                    .reorder({block, dense_val, ki, fpos1})
+                    .bound(dense_val, ko, 2, BoundType::MaxExact)
                     .parallelize(block, ParallelUnit::GPUBlock, OutputRaceStrategy::IgnoreRaces)
+                    .parallelize(ko, ParallelUnit::GPUWarp, OutputRaceStrategy::NoRaces)
                     .parallelize(fpos1, ParallelUnit::GPUThread, OutputRaceStrategy::Atomics);// .mypara(nnz, myattr);
                     return stmt;
 

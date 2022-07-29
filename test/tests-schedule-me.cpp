@@ -95,12 +95,14 @@ namespace mytest {
     IndexStmt SpMM_SR_RB(IndexStmt stmt, Tensor<float> A) {
         IndexVar block("block"), io("io"), warp("warp"), thread("thread");
         IndexVar warp_row("warp_row"), thread_col("thread_col");
+        IndexVar dense_col("dense_col");
         return stmt.reorder({i, k, j})
-                .split(i, block, io, 16)
+                .split(i, block, io, 256) // 16
                 .reorder({block, io, k, j})
-                .split(io, warp, warp_row, 1)
+                .split(io, warp, warp_row, 4)
                 .reorder({block, warp, warp_row, k, j})
-                .split(k, thread, thread_col, 4)
+                .split(k, dense_col, thread_col, 2) // 4
+                .bound(dense_col, thread, 1, BoundType::MaxExact)
                 .reorder({block, warp, warp_row, thread, thread_col, j})
                 .parallelize(block, ParallelUnit::GPUBlock, OutputRaceStrategy::NoRaces)
                 .parallelize(warp, ParallelUnit::GPUWarp, OutputRaceStrategy::NoRaces)
@@ -119,6 +121,8 @@ namespace mytest {
 
     IndexStmt SpMM_PR_RB(IndexStmt stmt, Tensor<float> A) {
         IndexVar io("io"), ko("ko"), ki("ki"), jpos("jpos"), jpos0("jpos0"), jpos1("jpos1");
+        // N = 128
+        /*
         return scalarPromote(stmt.reorder({i, k, j})
                                      .fuse(i, k, io)
                                      .split(io, ko, ki, 8) // 32 warp thread per block
@@ -131,6 +135,22 @@ namespace mytest {
                                      .parallelize(ki, ParallelUnit::GPUWarp, OutputRaceStrategy::Atomics) //
                                      .parallelize(jpos1, ParallelUnit::GPUThread,
                                                   OutputRaceStrategy::ParallelReduction));
+        */
+        IndexVar kio("kio"), kii("kii");
+      return scalarPromote(stmt.reorder({i,k,j})
+                                .fuse(i,k,io)
+                                .split(io,ko,ki,128)
+                                .reorder({ko,ki,j})
+                                .split(ki,kio,kii,2)
+                                .reorder({ko,kio,kii,j})
+                                .pos(j,jpos,A(i,j))
+                                .reorder({ko,kio,kii,jpos})
+                                .split(jpos, jpos0, jpos1, 4)
+                                .reorder({ko,kio,kii,jpos1,jpos0})
+                                .parallelize(ko, ParallelUnit::GPUBlock, OutputRaceStrategy::NoRaces)
+                                .parallelize(kio, ParallelUnit::GPUWarp, OutputRaceStrategy::Atomics)
+                                .parallelize(jpos1, ParallelUnit::GPUThread,OutputRaceStrategy::ParallelReduction));
+
     }
 
     IndexStmt scheduleSpGEMMCPU(IndexStmt stmt, bool doPrecompute) {
@@ -227,6 +247,7 @@ namespace mytest {
         set_CUDA_codegen_enabled(1);
         //_printToCout(stmt);
         _printToFile(filename,stmt);
+        cout<<stmt<<endl;
         ASSERT_EQ(1, 1);
     }
 
@@ -247,10 +268,12 @@ namespace mytest {
 
         IndexStmt stmt = _prepare(A,B,C);
         stmt = SpMM_PR_RB(stmt, A);
-        stmt = scalarPromote(stmt);
+        //stmt = scalarPromote(stmt);
         string filename = "pr_rb_test";
         set_CUDA_codegen_enabled(1);
         _printToCout(stmt);
+        _printToFile(filename,stmt);
+        cout<<stmt<<endl;
         ASSERT_EQ(1, 1);
     }
 }
