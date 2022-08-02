@@ -66,16 +66,16 @@ void Module::compileToSource(string path, string prefix) {
     }
   }
 
-  ofstream tmp_source_file;
+  ofstream source_file;
   string file_ending = should_use_CUDA_codegen() ? ".cu" : ".c";
-  tmp_source_file.open(tmpdir+prefix+file_ending);
-  tmp_source_file << source.str();
-  tmp_source_file.close();
+  source_file.open(path+prefix+file_ending);
+  source_file << source.str();
+  source_file.close();
 
-  ofstream tmp_header_file;
-  tmp_header_file.open(tmpdir+prefix+".h");
-  tmp_header_file << header.str();
-  tmp_header_file.close();
+  ofstream header_file;
+  header_file.open(path+prefix+".h");
+  header_file << header.str();
+  header_file.close();
 }
 
 void Module::compileToStaticLibrary(string path, string prefix) {
