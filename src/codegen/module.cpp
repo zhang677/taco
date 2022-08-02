@@ -27,7 +27,8 @@ std::uniform_int_distribution<int> Module::randint =
     std::uniform_int_distribution<int>(0, chars.length() - 1);
 
 void Module::setJITTmpdir() {
-  tmpdir = util::getTmpdir();
+  //tmpdir = util::getTmpdir();
+  tmpdir = "/Users/zhang/taco/build/bin/all_generated/";
 }
 
 void Module::setJITLibname() {
@@ -65,16 +66,16 @@ void Module::compileToSource(string path, string prefix) {
     }
   }
 
-  ofstream source_file;
+  ofstream tmp_source_file;
   string file_ending = should_use_CUDA_codegen() ? ".cu" : ".c";
-  source_file.open(path+prefix+file_ending);
-  source_file << source.str();
-  source_file.close();
-  
-  ofstream header_file;
-  header_file.open(path+prefix+".h");
-  header_file << header.str();
-  header_file.close();
+  tmp_source_file.open(tmpdir+prefix+file_ending);
+  tmp_source_file << source.str();
+  tmp_source_file.close();
+
+  ofstream tmp_header_file;
+  tmp_header_file.open(tmpdir+prefix+".h");
+  tmp_header_file << header.str();
+  tmp_header_file.close();
 }
 
 void Module::compileToStaticLibrary(string path, string prefix) {
@@ -99,6 +100,7 @@ void writeShims(vector<Stmt> funcs, string path, string prefix) {
     shims_file.open(path+prefix+"_shims.cpp");
   }
   else {
+    //shims_file.open(path+prefix+".c", ios::app);
     shims_file.open(path+prefix+".c", ios::app);
   }
   shims_file << "#include \"" << path << prefix << ".h\"\n";
