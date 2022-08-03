@@ -162,7 +162,13 @@ const string cHeaders =
   "  free(t);\n"
   "}\n"
   "#endif\n";
+
+string nHeaders = "";
 } // anonymous namespace
+
+void setCHeader(string newStr) {
+  nHeaders = newStr;
+}
 
 // find variables for generating declarations
 // generates a single var for each GetProperty
@@ -274,6 +280,9 @@ void CodeGen_C::compile(Stmt stmt, bool isFirst) {
   if (isFirst) {
     // output the headers
     out << cHeaders;
+    if (outputKind == CodeGen::ImplementationGen) {
+      out << nHeaders;
+    }
   }
   out << endl;
   // generate code for the Stmt
