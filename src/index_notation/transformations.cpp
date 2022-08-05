@@ -450,7 +450,10 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
                                          const std::vector<IndexVar>& iw_vars,
                                          const IndexExpr& e,
                                          map<IndexVar, IndexVar> substitutions) {
-
+            cout<<"Producer: "<<e<<endl;
+            for(auto sub: substitutions) {
+              cout<<sub.first<<"->"<<sub.second<<endl;
+            }
             auto a = ws(iw_vars) = replace(e, substitutions);
             IndexSetRel rel = a.getIndexSetRel();
             /// The reduceOp depends on the relation between indexVar sets of rhs and lhs. For rcl and inter, reduceOp
@@ -523,6 +526,7 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
 
                 // Build consumer by replacing with temporary (in replacedStmt)
                 IndexStmt replacedStmt = replace(s, {{e, ws(i_vars) }});
+                cout<<"ReplacedStmt: "<<replacedStmt<<endl;
                 if (replacedStmt != s) {
                     // Then modify the replacedStmt to have the correct foralls
                     // by concretizing the consumer assignment

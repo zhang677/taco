@@ -649,7 +649,7 @@ void TensorBase::compile(taco::IndexStmt stmt, bool assembleWhileCompute) {
 
   IndexStmt concretizedAssign = stmt;
   IndexStmt stmtToCompile = stmt.concretize();
-  stmtToCompile = scalarPromote(stmtToCompile);
+  //stmtToCompile = scalarPromote(stmtToCompile);
 
   if (!std::getenv("CACHE_KERNELS") ||
       std::string(std::getenv("CACHE_KERNELS")) != "0") {
@@ -773,7 +773,7 @@ void TensorBase::compile(taco::IndexStmt stmt, bool assembleWhileCompute) {
   ir::setCHeader(nHeaders);
   IndexStmt packStmt = generatePackCOOStmt(resAccess.getTensorVar(), resAccess.getIndexVars(), true);
   content->assembleFunc = lower(stmtToCompile, "assemble", true, false);
-  content->computeFunc = lower(stmtToCompile, "compute",  assembleWhileCompute, true);
+  //content->computeFunc = lower(stmtToCompile, "compute",  assembleWhileCompute, true);
   ir::Stmt packFunc = lower(packStmt, "pack_"+resAccess.getTensorVar().getName(), true, true, true);
   // If we have to recompile the kernel, we need to create a new Module. Since
   // the module we are holding on to could have been retrieved from the cache,
@@ -781,7 +781,7 @@ void TensorBase::compile(taco::IndexStmt stmt, bool assembleWhileCompute) {
   content->module = make_shared<Module>();
   content->module->addFunction(packFunc);
   content->module->addFunction(content->assembleFunc);
-  content->module->addFunction(content->computeFunc);
+  //content->module->addFunction(content->computeFunc);
   content->module->compile();
   cacheComputeKernel(concretizedAssign, content->module);
 }

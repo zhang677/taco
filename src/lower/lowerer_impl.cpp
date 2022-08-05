@@ -69,7 +69,7 @@ LowererImpl::LowererImpl() : visitor(new Visitor(this)) {
 }
 
 
-Stmt LowererImpl::lower(IndexStmt stmt) {
+Stmt LowererImpl::lower(IndexStmt stmt, std::string) {
   return visitor->lower(stmt);
 }
 

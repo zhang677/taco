@@ -629,6 +629,7 @@ TEST_P(spgemm, scheduling_eval) {
   Tensor<float> A("A", {NUM_I, NUM_J}, aFormat);
   Tensor<float> B("B", {NUM_J, NUM_K}, bFormat);
   Tensor<float> C("C", {NUM_I, NUM_K}, CSR);
+  Tensor<float> w("w", {NUM_I, NUM_K}, COO(2,true,true,false,{0,1}));
 
   srand(75883);
   for (int i = 0; i < NUM_I; i++) {
@@ -651,14 +652,26 @@ TEST_P(spgemm, scheduling_eval) {
 
   A.pack();
   B.pack();
-
-  C(i, k) = A(i, j) * B(j, k);
+  //IndexVar qi("qi"), qk("qk");
+  TensorVar W("W", Type(Float32,{(size_t)NUM_I, (size_t)NUM_K}),COO(2,true,true,false,{0,1}));
+  IndexExpr precomputedExpr = A(i, j) * B(j, k);
+  C(i, k) = precomputedExpr;
   IndexStmt stmt = C.getAssignment().concretize();
-  stmt = scheduleSpGEMMCPU(stmt, doPrecompute);
+  stmt = stmt.precompute(precomputedExpr, {i,k}, {i,k}, W);
+  // IndexStmt stmt = forall(i,
+  //             forall(k,
+  //                     where(C(i,k)=w(i,k), forall(j, w(i,k) = A(i,j) * B(j,k)))));
+  // IndexStmt stmt = forall(i,
+  //                         forall(k,
+  //                                forall(j,
+  //                                       where(C(i,k)=w(i,k),w(i,k)=A(i,j) * B(j,k)))));
+  //stmt = scheduleSpGEMMCPU(stmt, doPrecompute);
 
   //C.setAssembleWhileCompute(true);
+  std::cout<<"*****"<<stmt<<std::endl;
   C.compile(stmt);
   C.assemble();
+  std::cout<<"Compilation over!"<<std::endl;
   C.compute();
   printToFile("spgemm"+util::join(aFormat.getModeFormatPacks(),"_")+util::join(bFormat.getModeFormatPacks(),"_")+util::join(bFormat.getModeOrdering(),"_")+"_cpu",stmt);
 
@@ -674,7 +687,7 @@ INSTANTIATE_TEST_CASE_P(spgemm, spgemm,
                         Values(//std::make_tuple(CSR, CSR, true),
                                //std::make_tuple(DCSR, CSR, true),
                                //std::make_tuple(DCSR, DCSR, true),
-                               std::make_tuple(CSR, CSC, true)));
+                               std::make_tuple(CSR, CSC, false)));
                                //std::make_tuple(DCSR, DCSC, true)));
 
 TEST(scheduling_eval, spmataddCPU) {

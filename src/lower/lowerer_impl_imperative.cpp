@@ -2935,8 +2935,15 @@ Expr LowererImplImperative::lowerTensorOp(Call op) {
   return op.getFunc()(args);
 }
 
-Stmt LowererImplImperative::lower(IndexStmt stmt) {
-  return visitor->lower(stmt);
+Stmt LowererImplImperative::lower(IndexStmt stmt, std::string name) {
+  cout<<"——————————————————————————————————————————————————————————"<<endl;
+  cout<<"Called by : "<<name<<endl;
+  cout<<"Stmt: "<<stmt<<endl;
+  Stmt tmp = visitor->lower(stmt);
+  cout<<" Return: "<<tmp;
+  //return visitor->lower(stmt);
+  cout<<"----------------------------------------------------------"<<endl;
+  return tmp;
 }
 
 
