@@ -52,6 +52,8 @@ protected:
   int labelCount;
   bool emittingCoroutine;
 
+  bool emittingSpWS = true;
+
   class FindVars;
 
 private:

@@ -2,8 +2,10 @@
 #define TACO_CODEGEN_H
 
 #include <memory>
+#include <map>
 #include "taco/ir/ir.h"
 #include "taco/ir/ir_printer.h"
+
 
 namespace taco {
 namespace ir {
@@ -56,6 +58,9 @@ protected:
   void resetUniqueNameCounters();
   std::string genUniqueName(std::string name);
   void doIndentStream(std::stringstream &stream);
+
+  std::string printWsFuncs(std::map<std::string,std::pair<int,std::string>> wsvars);
+
   CodeGenType codeGenType;
 
 private:

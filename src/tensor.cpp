@@ -660,11 +660,21 @@ void TensorBase::compile(taco::IndexStmt stmt, bool assembleWhileCompute) {
       return;
     }
   }
-
+  /*
   std::pair<std::vector<Access>,std::set<Access>> resTemp = getResultAccesses((this->getAssignment()));
   std::vector<Access> resAccesses = resTemp.first;
   std::set<Access> redAccess = resTemp.second;
   Access resAccess = resAccesses[0];
+  std::string w_order = to_string(resAccess.getTensorVar().getType().getShape().getOrder());
+  std::stringstream ssHeaders;
+  Type type = resAccess.getTensorVar().getType().getDataType();
+   */
+
+  vector<Access> tempRes= getTemporaryAccesses(stmtToCompile);
+  for(auto resAccess: tempRes) {
+    std::cout<<resAccess.getTensorVar().getName()<<","<<to_string(resAccess.getTensorVar().getType().getShape().getOrder())<<","<<resAccess.getTensorVar().getType().getDataType()<<std::endl;
+  }
+  Access resAccess = tempRes[0];
   std::string w_order = to_string(resAccess.getTensorVar().getType().getShape().getOrder());
   std::stringstream ssHeaders;
   Type type = resAccess.getTensorVar().getType().getDataType();
@@ -763,8 +773,9 @@ void TensorBase::compile(taco::IndexStmt stmt, bool assembleWhileCompute) {
                "      }\n"
                "      COO_vals[i] = tmp_COO_vals[i];\n"
                "    }\n"
-               "    free(tmp_COO_crd[0]);\n"
-               "    free(tmp_COO_crd[1]);\n"
+               "    for (int i=0; i < w_order; i++) {"
+               "      free(tmp_COO_crd[i]);\n"
+               "    }\n"
                "    free(tmp_COO_vals);\n"
                "    return target_pointer;\n"
                "  }\n";

@@ -3616,6 +3616,42 @@ std::vector<Access> getArgumentAccesses(IndexStmt stmt)
   return result;
 }
 
+std::vector<Access> getTemporaryAccesses(IndexStmt stmt)
+{
+  vector<Access> tempRes;
+  set<TensorVar> temporaries = util::toSet(getTemporaries(stmt));
+  match(stmt,
+    function<void(const AssignmentNode*)>([&](const AssignmentNode* op) {
+      if (util::contains(temporaries, (op->lhs).getTensorVar())) {
+        tempRes.push_back(op->lhs);
+      }
+    }),
+    function<void(const SequenceNode*,Matcher*)>([&](const SequenceNode* op,
+                                                     Matcher* ctx) {
+      ctx->match(op->definition);
+      ctx->match(op->mutation);
+    }),
+    function<void(const MultiNode*,Matcher*)>([&](const MultiNode* op,
+                                                  Matcher* ctx) {
+      ctx->match(op->stmt1);
+      ctx->match(op->stmt2);
+    }),
+    function<void(const WhereNode*,Matcher*)>([&](const WhereNode* op,
+                                                  Matcher* ctx) {
+      ctx->match(op->consumer);
+      ctx->match(op->producer);
+    }),
+    function<void(const AssembleNode*,Matcher*)>([&](const AssembleNode* op,
+                                                     Matcher* ctx) {
+      ctx->match(op->compute);
+      if (op->queries.defined()) {
+        ctx->match(op->queries);
+      }
+    })
+  );
+  return tempRes;
+}
+
 // Return corresponding underived indexvars
 struct GetIndexVars : IndexNotationVisitor {
   GetIndexVars(ProvenanceGraph provGraph) : provGraph(provGraph) {}

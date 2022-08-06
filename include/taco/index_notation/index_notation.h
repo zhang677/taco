@@ -1324,6 +1324,8 @@ std::pair<std::vector<Access>,std::set<Access>> getResultAccesses(IndexStmt stmt
 /// Returns the input accesses, in the order they appear.
 std::vector<Access> getArgumentAccesses(IndexStmt stmt);
 
+std::vector<Access> getTemporaryAccesses(IndexStmt stmt);
+
 /// Returns the index variables in the index statement.
 std::vector<IndexVar> getIndexVars(IndexStmt stmt);
 

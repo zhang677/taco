@@ -337,8 +337,12 @@ void CodeGen_C::visit(const Function* func) {
         << endl;
   }
 
+  if (emittingSpWS) {
+    out << printWsFuncs(func->wsvars) << endl;
+  }
+
   // output body
-  print(func->body);
+  print(func->body); // LLIR code
 
   // output repack only if we allocated memory
   if (checkForAlloc(func))

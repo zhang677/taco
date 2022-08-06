@@ -437,13 +437,26 @@ LowererImplImperative::lower(IndexStmt stmt, string name,
     }
   }
 
+  vector<Access> tempAccesses = getTemporaryAccesses(stmt);
+  std::map<std::string,std::pair<int,std::string>> wsvars;
+  for (auto& resAccess: tempAccesses) {
+    std::string name = resAccess.getTensorVar().getName();
+    int mode = resAccess.getTensorVar().getType().getShape().getOrder();
+    std::stringstream type;
+    type << resAccess.getTensorVar().getType().getDataType();
+    std::string dType;
+    type >> dType;
+    wsvars.insert({name, {mode, dType}});
+  }
+
   // Create function
   return Function::make(name, resultsIR, argumentsIR,
                         Block::blanks(Block::make(header),
                                       initializeResults,
                                       body,
                                       finalizeResults,
-                                      Block::make(footer)));
+                                      Block::make(footer)),
+                                      wsvars);
 }
 
 

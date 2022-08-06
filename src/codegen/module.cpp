@@ -118,6 +118,7 @@ string Module::compile() {
   string cflags;
   string file_ending;
   string shims_file;
+  string ws_file;
   if (should_use_CUDA_codegen()) {
     cc = util::getFromEnv("TACO_NVCC", "nvcc");
     cflags = util::getFromEnv("TACO_NVCCFLAGS",
@@ -144,11 +145,12 @@ string Module::compile() {
   }
   
   string cmd = cc + " " + cflags + " " +
-    prefix + file_ending + " " + shims_file + " " + 
+    prefix + file_ending + " " + shims_file + " " + " "
     "-o " + fullpath + " -lm";
 
   // open the output file & write out the source
   compileToSource(tmpdir, libname);
+
   
   // write out the shims
   writeShims(funcs, tmpdir, libname);

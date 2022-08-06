@@ -657,7 +657,7 @@ TEST_P(spgemm, scheduling_eval) {
   IndexExpr precomputedExpr = A(i, j) * B(j, k);
   C(i, k) = precomputedExpr;
   IndexStmt stmt = C.getAssignment().concretize();
-  stmt = stmt.precompute(precomputedExpr, {i,k}, {i,k}, W);
+  //stmt = stmt.precompute(precomputedExpr, {i,k}, {i,k}, W);
   // IndexStmt stmt = forall(i,
   //             forall(k,
   //                     where(C(i,k)=w(i,k), forall(j, w(i,k) = A(i,j) * B(j,k)))));
@@ -665,9 +665,9 @@ TEST_P(spgemm, scheduling_eval) {
   //                         forall(k,
   //                                forall(j,
   //                                       where(C(i,k)=w(i,k),w(i,k)=A(i,j) * B(j,k)))));
-  //stmt = scheduleSpGEMMCPU(stmt, doPrecompute);
+  stmt = scheduleSpGEMMCPU(stmt, doPrecompute);
 
-  //C.setAssembleWhileCompute(true);
+  C.setAssembleWhileCompute(true);
   std::cout<<"*****"<<stmt<<std::endl;
   C.compile(stmt);
   C.assemble();
@@ -687,7 +687,7 @@ INSTANTIATE_TEST_CASE_P(spgemm, spgemm,
                         Values(//std::make_tuple(CSR, CSR, true),
                                //std::make_tuple(DCSR, CSR, true),
                                //std::make_tuple(DCSR, DCSR, true),
-                               std::make_tuple(CSR, CSC, false)));
+                               std::make_tuple(CSR, CSC, true)));
                                //std::make_tuple(DCSR, DCSC, true)));
 
 TEST(scheduling_eval, spmataddCPU) {

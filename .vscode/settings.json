@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "*.td": "mlir",
-        "vector": "cpp"
+        "vector": "cpp",
+        "iosfwd": "cpp"
     }
 }

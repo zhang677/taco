@@ -655,5 +655,110 @@ void CodeGen::printYield(const Yield* op, vector<Expr> localVars,
   stream << labelPrefix << funcName << (labelCount++) << ":;" << endl;
 }
 
+std::string CodeGen::printWsFuncs(std::map<std::string, std::pair<int, std::string>> wsvars) {
+  stringstream ret;
+  for (auto& item: wsvars) {
+    string clsname = item.first+"space";
+    string cmpname = item.first+"_cmp";
+    int order = item.second.first;
+    string type = item.second.second;
+    ret << "typedef struct " << clsname << "{" <<endl;
+    ret << "  int32_t crd[" << order << "];" <<endl;
+    ret << " " << type << " val;" <<endl;
+    ret << "} ;\n";
+    ret << "int " << cmpname <<"(const void *b, const void *a) {" <<endl;
+    ret << "for (int i = 0; i < " << order << "; i++) {"<<endl;
+    ret << " if ((("<<clsname<<"*)b)->crd[i] == (("<<clsname<<"*)a)->crd[i]) continue;" <<endl;
+    ret << " return ((("<<clsname<<"*)b)->crd[i] - (("<<clsname<<"*)a)->crd[i]);" <<endl;
+    ret << "}" <<endl;
+    ret << "int Enlarge(int32_t** COO_crd, "<<type<<"** COO_vals, int COO_capacity) {"<<endl;
+    ret << " COO_capacity = COO_capacity * 2;" <<endl;
+    for (int i=0;i<order;i++) {
+      ret << "  COO_crd["<<i<<"] = (int32_t*)realloc(COO_crd["<<i<<"], sizeof(int32_t) * COO_capacity);" << endl;
+    }
+    ret << "}" <<endl;
+    ret << "*COO_vals = ("<<type<<"*)realloc(*COO_vals, sizeof("<<type<<") * COO_capacity);" << endl;
+    ret <<  "return COO_capacity;" <<endl;
+    ret << "}" <<endl;
+    ret << "int Merge(int32_t** COO_crd, "<<type<<"* COO_vals, int32_t COO_size, wspace* accumulator, int32_t accumulator_size) {\n";
+    ret << "    if (COO_size == 0) {\n";
+    ret << "      for (int i=0; i<accumulator_size; i++) {\n";
+    for (int j=0;j<order;j++) {
+      ret << "          COO_crd["<<j<<"][i] = accumulator[i].crd["<<j<<"];\n";
+    }
+    ret << "        COO_vals[i] = accumulator[i].val;\n";
+    ret << "      }\n";
+    ret << "      return accumulator_size;\n";
+    ret << "    }\n";
+    ret << "    int32_t* tmp_COO_crd["<< order <<"];\n";
+    ret << "    "<<type<<"* tmp_COO_vals;\n";
+    for (int i=0;i<order;i++) {
+      ret << "      tmp_COO_crd["<<i<<"] = (int32_t*)malloc(sizeof(int32_t) * (accumulator_size + COO_size));\n";
+    }
+    ret << "    }\n";
+    ret << "    tmp_COO_vals = ("<<type<<"*)malloc(sizeof("<<type<<") * (accumulator_size + COO_size));\n";
+    ret << "    int accumulator_pointer = 0;\n"
+           "    int content_pointer = 0;\n"
+           "    int target_pointer = 0;\n";
+    ret << "    "<<clsname<<" tmp_con;\n";
+    ret << "    while(accumulator_pointer < accumulator_size && content_pointer < COO_size) {\n";
+    for (int i=0; i<order; i++) {
+      ret << "        tmp_con.crd["<<i<<"] = COO_crd["<<i<<"][content_pointer];\n";
+    }
+    ret << "      if ("<<cmpname<<"(&accumulator[accumulator_pointer], &tmp_con) == 0) {\n";
+    for (int i=0; i<order; i++) {
+      ret << "          tmp_COO_crd["<<i<<"][target_pointer] = accumulator[accumulator_pointer].crd["<<i<<"];\n";
+    }
+    ret << "        tmp_COO_vals[target_pointer] = accumulator[accumulator_pointer].val + COO_vals[content_pointer];\n"
+           "        accumulator_pointer ++;\n"
+           "        content_pointer ++;\n"
+           "        target_pointer ++;\n";
+    ret << "      } else if ("<<cmpname<<"(&accumulator[accumulator_pointer], &tmp_con) < 0) {\n";
+    for (int i=0; i<order; i++) {
+      ret << "          tmp_COO_crd["<<i<<"][target_pointer] = accumulator[accumulator_pointer].crd["<<i<<"];\n";
+    }
+    ret << "        tmp_COO_vals[target_pointer] = accumulator[accumulator_pointer].val + COO_vals[content_pointer];\n"
+           "        accumulator_pointer ++;\n"
+           "        target_pointer ++;\n";
+    ret << "      } else {\n";
+    for (int i=0; i<order; i++) {
+      ret << "          tmp_COO_crd["<<i<<"][target_pointer] = COO_crd["<<i<<"][content_pointer];\n";
+    }
+    ret << "        tmp_COO_vals[target_pointer] = COO_vals[content_pointer];\n"
+           "        content_pointer ++;\n"
+           "        target_pointer ++;\n"
+           "      }\n"
+           "    }\n"
+           "    while(accumulator_pointer<accumulator_size) {\n";
+    for (int i=0; i<order; i++) {
+      ret << "          tmp_COO_crd["<<i<<"][target_pointer] = accumulator[accumulator_pointer].crd["<<i<<"];\n";
+    }
+    ret << "      tmp_COO_vals[target_pointer] = accumulator[accumulator_pointer].val;\n"
+           "      accumulator_pointer ++;\n"
+           "      target_pointer ++;\n"
+           "    }\n";
+    ret << "    while(content_pointer<COO_size) {\n";
+    for (int i=0; i<order; i++) {
+      ret << "          tmp_COO_crd["<<i<<"][target_pointer] = COO_crd["<<i<<"][content_pointer];\n";
+    }
+    ret << "      tmp_COO_vals[target_pointer] = COO_vals[content_pointer];\n"
+           "      content_pointer ++;\n"
+           "      target_pointer ++;\n"
+           "    }\n";
+    ret << "    for (int i = 0; i < target_pointer; i++) {\n";
+    for (int j=0; j<order; j++) {
+      ret << "        COO_crd["<<j<<"][i] = tmp_COO_crd["<<j<<"][i];\n";
+    }
+    ret << "      COO_vals[i] = tmp_COO_vals[i];\n"
+           "    }\n";
+    for (int i=0; i<order; i++) {
+      ret << "      free(tmp_COO_crd["<<i<<"]);\n";
+    }
+    ret << "    free(tmp_COO_vals);\n"
+           "    return target_pointer;\n"
+           "  }\n";
+  }
+
+}
 
 }}
