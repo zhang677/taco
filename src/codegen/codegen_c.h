@@ -24,6 +24,7 @@ public:
   /// Generate shims that unpack an array of pointers representing
   /// a mix of taco_tensor_t* and scalars into a function call
   static void generateShim(const Stmt& func, std::stringstream &stream);
+  bool emittingSpWS = true;
 
 protected:
   using IRPrinter::visit;
@@ -52,12 +53,12 @@ protected:
   int labelCount;
   bool emittingCoroutine;
 
-  bool emittingSpWS = true;
 
   class FindVars;
 
 private:
   virtual std::string restrictKeyword() const { return "restrict"; }
+  bool IsFirst = true;
 };
 
 } // namespace ir

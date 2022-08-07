@@ -276,13 +276,10 @@ CodeGen_C::~CodeGen_C() {}
 void CodeGen_C::compile(Stmt stmt, bool isFirst) {
   varMap = {};
   localVars = {};
-
+  IsFirst = isFirst;
   if (isFirst) {
     // output the headers
     out << cHeaders;
-    if (outputKind == CodeGen::ImplementationGen) {
-      out << nHeaders;
-    }
   }
   out << endl;
   // generate code for the Stmt
@@ -295,7 +292,10 @@ void CodeGen_C::visit(const Function* func) {
     out << "#ifndef TACO_GENERATED_" << func->name << "\n";
     out << "#define TACO_GENERATED_" << func->name << "\n";
   }
-
+  if (IsFirst && outputKind == ImplementationGen && emittingSpWS && !(func->wsvars).empty()) {
+    out << printWsFuncs(func->wsvars) << endl;
+    IsFirst = false;
+  }
   int numYields = countYields(func);
   emittingCoroutine = (numYields > 0);
   funcName = func->name;
@@ -336,11 +336,6 @@ void CodeGen_C::visit(const Function* func) {
     out << printContextDeclAndInit(varMap, localVars, numYields, func->name)
         << endl;
   }
-
-  if (emittingSpWS) {
-    out << printWsFuncs(func->wsvars) << endl;
-  }
-
   // output body
   print(func->body); // LLIR code
 

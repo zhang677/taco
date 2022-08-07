@@ -660,139 +660,15 @@ void TensorBase::compile(taco::IndexStmt stmt, bool assembleWhileCompute) {
       return;
     }
   }
-  /*
-  std::pair<std::vector<Access>,std::set<Access>> resTemp = getResultAccesses((this->getAssignment()));
-  std::vector<Access> resAccesses = resTemp.first;
-  std::set<Access> redAccess = resTemp.second;
-  Access resAccess = resAccesses[0];
-  std::string w_order = to_string(resAccess.getTensorVar().getType().getShape().getOrder());
-  std::stringstream ssHeaders;
-  Type type = resAccess.getTensorVar().getType().getDataType();
-   */
 
-  vector<Access> tempRes= getTemporaryAccesses(stmtToCompile);
-  for(auto resAccess: tempRes) {
-    std::cout<<resAccess.getTensorVar().getName()<<","<<to_string(resAccess.getTensorVar().getType().getShape().getOrder())<<","<<resAccess.getTensorVar().getType().getDataType()<<std::endl;
-  }
-  Access resAccess = tempRes[0];
-  std::string w_order = to_string(resAccess.getTensorVar().getType().getShape().getOrder());
-  std::stringstream ssHeaders;
-  Type type = resAccess.getTensorVar().getType().getDataType();
-  std::string nHeaders;
-  ssHeaders << type;
-  string typeD;
-  ssHeaders >> typeD;
-  nHeaders = "const int w_order = "+ w_order + ";\n"
-             "typedef struct {\n"
-             "  int32_t crd["+ w_order +"];\n"
-             "  "+ typeD +" val;\n"
-             "}wspace ;\n"
-             "int esc_cmp(const void *b, const void *a) {\n"
-             "const int psize = w_order;\n"
-             "for (int i=0; i<psize; i++) {\n"
-             "  if (((wspace*)b)->crd[i] == ((wspace*)a)->crd[i]) continue;\n"
-             "  return (((wspace*)b)->crd[i] - ((wspace*)a)->crd[i]);\n"
-             "}\n"
-             "return (((wspace*)b)->crd[psize-1] - ((wspace*)a)->crd[psize-1]);\n"
-             "}\n"
-             "int Enlarge(int32_t** COO_crd, "+typeD+"** COO_vals, int COO_capacity) {\n"
-             " COO_capacity = COO_capacity * 2;\n"
-             " for (int i = 0; i<w_order; i++) {\n"
-             "  COO_crd[i] = (int32_t*)realloc(COO_crd[i], sizeof(int32_t) * COO_capacity);\n"
-             " }\n"
-             "*COO_vals = ("+typeD+"*)realloc(*COO_vals, sizeof("+typeD+") * COO_capacity);\n"
-             "return COO_capacity;\n"
-             "}\n"
-             "int Merge(int32_t** COO_crd, "+typeD+"* COO_vals, int32_t COO_size, wspace* accumulator, int32_t accumulator_size) {\n"
-             "    if (COO_size == 0) {\n"
-               "      for (int i=0; i<accumulator_size; i++) {\n"
-               "        for (int j=0; j<w_order; j++) {\n"
-               "          COO_crd[j][i] = accumulator[i].crd[j];\n"
-               "        }\n"
-               "        COO_vals[i] = accumulator[i].val;\n"
-               "      }\n"
-               "      return accumulator_size;\n"
-               "    }\n"
-               "    int32_t* tmp_COO_crd["+ w_order +"];\n"
-               "    "+typeD+"* tmp_COO_vals;\n"
-               "    for (int i=0; i<w_order; i++) {\n"
-               "      tmp_COO_crd[i] = (int32_t*)malloc(sizeof(int32_t) * (accumulator_size + COO_size));\n"
-               "    }\n"
-               "    tmp_COO_vals = ("+typeD+"*)malloc(sizeof("+typeD+") * (accumulator_size + COO_size));\n"
-               "    int accumulator_pointer = 0;\n"
-               "    int content_pointer = 0;\n"
-               "    int target_pointer = 0;\n"
-               "    wspace tmp_con;\n"
-               "    while(accumulator_pointer < accumulator_size && content_pointer < COO_size) {\n"
-               "      for (int i=0; i<w_order; i++) {\n"
-               "        tmp_con.crd[i] = COO_crd[i][content_pointer];\n"
-               "      }\n"
-               "      if (esc_cmp(&accumulator[accumulator_pointer], &tmp_con) == 0) {\n"
-               "        for (int i=0; i<w_order; i++) {\n"
-               "          tmp_COO_crd[i][target_pointer] = accumulator[accumulator_pointer].crd[i];\n"
-               "        }\n"
-               "        tmp_COO_vals[target_pointer] = accumulator[accumulator_pointer].val + COO_vals[content_pointer];\n"
-               "        accumulator_pointer ++;\n"
-               "        content_pointer ++;\n"
-               "        target_pointer ++;\n"
-               "      } else if (esc_cmp(&accumulator[accumulator_pointer], &tmp_con) < 0) {\n"
-               "        for (int i=0; i<w_order; i++) {\n"
-               "          tmp_COO_crd[i][target_pointer] = accumulator[accumulator_pointer].crd[i];\n"
-               "        }\n"
-               "        tmp_COO_vals[target_pointer] = accumulator[accumulator_pointer].val;\n"
-               "        accumulator_pointer ++;\n"
-               "        target_pointer ++;\n"
-               "      } else {\n"
-               "        for (int i=0; i<w_order; i++) {\n"
-               "          tmp_COO_crd[i][target_pointer] = COO_crd[i][content_pointer];\n"
-               "        }\n"
-               "        tmp_COO_vals[target_pointer] = COO_vals[content_pointer];\n"
-               "        content_pointer ++;\n"
-               "        target_pointer ++;\n"
-               "      }\n"
-               "    }\n"
-               "    while(accumulator_pointer<accumulator_size) {\n"
-               "      for (int i=0; i<w_order; i++) {\n"
-               "        tmp_COO_crd[i][target_pointer] = accumulator[accumulator_pointer].crd[i];\n"
-               "      } \n"
-               "      tmp_COO_vals[target_pointer] = accumulator[accumulator_pointer].val;\n"
-               "      accumulator_pointer ++;\n"
-               "      target_pointer ++;\n"
-               "    }\n"
-               "    while(content_pointer<COO_size) {\n"
-               "      for (int i=0; i<w_order; i++) {\n"
-               "          tmp_COO_crd[i][target_pointer] = COO_crd[i][content_pointer];\n"
-               "      }\n"
-               "      tmp_COO_vals[target_pointer] = COO_vals[content_pointer];\n"
-               "      content_pointer ++;\n"
-               "      target_pointer ++;\n"
-               "    }\n"
-               "    for (int i = 0; i < target_pointer; i++) {\n"
-               "      for (int j = 0; j < w_order; j++) {\n"
-               "        COO_crd[j][i] = tmp_COO_crd[j][i];\n"
-               "      }\n"
-               "      COO_vals[i] = tmp_COO_vals[i];\n"
-               "    }\n"
-               "    for (int i=0; i < w_order; i++) {"
-               "      free(tmp_COO_crd[i]);\n"
-               "    }\n"
-               "    free(tmp_COO_vals);\n"
-               "    return target_pointer;\n"
-               "  }\n";
-
-
-  ir::setCHeader(nHeaders);
-  IndexStmt packStmt = generatePackCOOStmt(resAccess.getTensorVar(), resAccess.getIndexVars(), true);
   content->assembleFunc = lower(stmtToCompile, "assemble", true, false);
-  //content->computeFunc = lower(stmtToCompile, "compute",  assembleWhileCompute, true);
-  ir::Stmt packFunc = lower(packStmt, "pack_"+resAccess.getTensorVar().getName(), true, true, true);
+  content->computeFunc = lower(stmtToCompile, "compute",  assembleWhileCompute, true);
   // If we have to recompile the kernel, we need to create a new Module. Since
   // the module we are holding on to could have been retrieved from the cache,
   // we can't modify it.
   content->module = make_shared<Module>();
-  content->module->addFunction(packFunc);
   content->module->addFunction(content->assembleFunc);
-  //content->module->addFunction(content->computeFunc);
+  content->module->addFunction(content->computeFunc);
   content->module->compile();
   cacheComputeKernel(concretizedAssign, content->module);
 }

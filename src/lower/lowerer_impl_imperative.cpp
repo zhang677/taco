@@ -446,17 +446,19 @@ LowererImplImperative::lower(IndexStmt stmt, string name,
     type << resAccess.getTensorVar().getType().getDataType();
     std::string dType;
     type >> dType;
-    wsvars.insert({name, {mode, dType}});
+    if (mode > 1) {
+      wsvars.insert({name, {mode, dType}});
+    }
   }
 
   // Create function
   return Function::make(name, resultsIR, argumentsIR,
-                        Block::blanks(Block::make(header),
-                                      initializeResults,
-                                      body,
-                                      finalizeResults,
-                                      Block::make(footer)),
-                                      wsvars);
+                          Block::blanks(Block::make(header),
+                                        initializeResults,
+                                        body,
+                                        finalizeResults,
+                                        Block::make(footer)),
+                                        wsvars);
 }
 
 
@@ -2953,7 +2955,8 @@ Stmt LowererImplImperative::lower(IndexStmt stmt, std::string name) {
   cout<<"Called by : "<<name<<endl;
   cout<<"Stmt: "<<stmt<<endl;
   Stmt tmp = visitor->lower(stmt);
-  cout<<" Return: "<<tmp;
+  cout<<name<<" Return: "<<endl;
+  cout<<tmp;
   //return visitor->lower(stmt);
   cout<<"----------------------------------------------------------"<<endl;
   return tmp;
