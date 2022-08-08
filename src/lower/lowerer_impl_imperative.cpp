@@ -437,6 +437,7 @@ LowererImplImperative::lower(IndexStmt stmt, string name,
     }
   }
 
+
   vector<Access> tempAccesses = getTemporaryAccesses(stmt);
   std::map<std::string,std::pair<int,std::string>> wsvars;
   for (auto& resAccess: tempAccesses) {
@@ -536,6 +537,12 @@ Stmt LowererImplImperative::lowerAssignment(Assignment assignment)
       }
     }
 
+    cout<<"accessStmts: ";
+    for(auto& a: accessStmts) {
+      cout<<a;
+    }
+    cout<<endl;
+
     if (needComputeAssign && values.defined()) {
       if (!assignment.getOperator().defined()) {
         computeStmt = Store::make(values, loc, rhs);
@@ -559,11 +566,13 @@ Stmt LowererImplImperative::lowerAssignment(Assignment assignment)
       }
       taco_iassert(computeStmt.defined());
     }
+    cout<<"computeStmt1: "<<computeStmt<<endl;
 
     if (!accessStmts.empty()) {
       accessStmts.push_back(computeStmt);
       computeStmt = Block::make(accessStmts);
     }
+    cout<<"computeStmt2: "<<computeStmt<<endl;
   }
 
   if (util::contains(guardedTemps, result) && result.getOrder() == 0) {
@@ -572,7 +581,7 @@ Stmt LowererImplImperative::lowerAssignment(Assignment assignment)
                                  atomicParallelUnit);
     computeStmt = Block::make(computeStmt, setGuard);
   }
-
+  cout<<"computeStmt3: "<<computeStmt<<endl;
   Expr assembleGuard = generateAssembleGuard(assignment.getRhs());
   const bool assembleGuardTrivial = isa<ir::Literal>(assembleGuard);
 
@@ -584,7 +593,7 @@ Stmt LowererImplImperative::lowerAssignment(Assignment assignment)
     return assembleGuardTrivial ? computeStmt : IfThenElse::make(assembleGuard,
                                                                  computeStmt);
   }
-
+  cout<<"computeStmt4: "<<computeStmt<<endl;
   if (temporaryWithSparseAcceleration) {
     taco_iassert(markAssignsAtomicDepth == 0)
       << "Parallel assembly of sparse accelerator not supported";
@@ -616,7 +625,7 @@ Stmt LowererImplImperative::lowerAssignment(Assignment assignment)
     computeStmt = IfThenElse::make(ir::Neg::make(readBitGuard),
                                    firstWriteAtIndex, computeStmt);
   }
-
+  cout<<"computeStmt5: "<<computeStmt<<endl;
   return assembleGuardTrivial ? computeStmt : IfThenElse::make(assembleGuard,
                                                                computeStmt);
 }
@@ -661,6 +670,7 @@ LowererImplImperative::splitAppenderAndInserters(const vector<Iterator>& results
 
 Stmt LowererImplImperative::lowerForall(Forall forall)
 {
+  cout<<"Into lowerForall"<<endl;
   bool hasExactBound = provGraph.hasExactBound(forall.getIndexVar());
   bool forallNeedsUnderivedGuards = !hasExactBound && emitUnderivedGuards;
   if (!ignoreVectorize && forallNeedsUnderivedGuards &&
@@ -2641,6 +2651,8 @@ Stmt LowererImplImperative::lowerAssemble(Assemble assemble) {
 
       TemporaryArrays arrays;
       arrays.values = values;
+      cout<<"queryResult: "<<queryResult<<endl;
+      cout<<"arrays: "<<arrays.values<<endl;
       this->temporaryArrays.insert({queryResult, arrays});
 
       // Compute size of query result
@@ -2786,6 +2798,8 @@ Stmt LowererImplImperative::lowerAssemble(Assemble assemble) {
   }
   Stmt finalizeAssemble = Block::make(finalizeAssembleStmts);
 
+  cout<<"initAssemble: "<<initAssemble<<endl;
+  cout<<"FinalAssemble: "<<finalizeAssemble<<endl;
   return Block::blanks(queries,
                        initAssemble,
                        compute,
@@ -2955,9 +2969,9 @@ Stmt LowererImplImperative::lower(IndexStmt stmt, std::string name) {
   cout<<"Called by : "<<name<<endl;
   cout<<"Stmt: "<<stmt<<endl;
   Stmt tmp = visitor->lower(stmt);
-  cout<<name<<" Return: "<<endl;
+  cout<<name<<" lower call Return: "<<endl;
+  cout<<"Stmt: "<<stmt<<endl;
   cout<<tmp;
-  //return visitor->lower(stmt);
   cout<<"----------------------------------------------------------"<<endl;
   return tmp;
 }

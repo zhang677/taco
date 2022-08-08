@@ -1196,8 +1196,8 @@ IndexStmt SetAssembleStrategy::apply(IndexStmt stmt, string* reason) const {
   }
 
   // FIXME: Unneeded if scalar promotion is made default when concretizing
-  loweredQueries = scalarPromote(loweredQueries);
-
+  // loweredQueries = scalarPromote(loweredQueries);
+  cout<<"loweredQueries: "<<loweredQueries<<endl;
   // Tracks all tensors that correspond to attribute query results or that are 
   // used to compute attribute queries
   std::set<TensorVar> insertedResults;  
@@ -1225,6 +1225,17 @@ IndexStmt SetAssembleStrategy::apply(IndexStmt stmt, string* reason) const {
     IndexStmt lower(IndexStmt stmt) {
       arguments = getArguments(stmt);
       temps = getTemporaries(stmt);
+      cout << "temps: ";
+      for(auto& t : temps) {
+         cout << t << ",";
+      }
+      cout<<endl;
+      cout << "arguments: ";
+      for(auto& t : arguments) {
+        cout << t << ",";
+      }
+      cout<<endl;
+
       for (const auto& tmp : temps) {
         tempReplacements[tmp] = TensorVar("q" + tmp.getName(), 
                                           Type(Bool, tmp.getType().getShape()), 
@@ -1234,6 +1245,7 @@ IndexStmt SetAssembleStrategy::apply(IndexStmt stmt, string* reason) const {
       queryResults = Assemble::AttrQueryResults();
       epilog = IndexStmt();
       stmt = IndexNotationRewriter::rewrite(stmt);
+      cout<<"epilog: "<<epilog<<endl;
       if (epilog.defined()) {
         stmt = Where(epilog, stmt);
       }
@@ -1278,13 +1290,11 @@ IndexStmt SetAssembleStrategy::apply(IndexStmt stmt, string* reason) const {
         stmt = (rhs != op->rhs) ? Assignment(lhs, rhs, reduceOp) : op;
         return;
       }
-
       if (op->op.defined()) {
         reason = "Precondition failed: Ungrouped insertion not support for "
                  "output tensors that are scattered into";
         return;
       }
-
       queryResults[resultTensor] =
           std::vector<std::vector<TensorVar>>(resultTensor.getOrder());
 
@@ -1303,10 +1313,20 @@ IndexStmt SetAssembleStrategy::apply(IndexStmt stmt, string* reason) const {
 
         parentCoords.push_back(indices[modeOrdering[i]]);
         childCoords.erase(childCoords.begin());
-
+        cout<<"ModeName: "<<modeName<<endl;
         for (const auto& query:
             modeFormats[i].getAttrQueries(parentCoords, childCoords)) {
           const auto& groupBy = query.getGroupBy();
+          cout<<"Attrs: ";
+          for(auto& a: query.getAttrs()) {
+            cout<<a<<",";
+          }
+          cout<<endl;
+          cout<<"GroupBy: ";
+          for(auto& g: groupBy) {
+            cout<<g<<",";
+          }
+          cout<<endl;
 
           // TODO: support multiple aggregations in single query
           taco_iassert(query.getAttrs().size() == 1);
@@ -1316,6 +1336,8 @@ IndexStmt SetAssembleStrategy::apply(IndexStmt stmt, string* reason) const {
             const auto pos = std::find(groupBy.begin(), groupBy.end(), coord)
                            - groupBy.begin();
             const auto dim = resultTensor.getType().getShape().getDimension(pos);
+            cout<<"pos: "<<pos<<endl;
+            cout<<"dim: "<<dim<<endl;
             queryDims.push_back(dim);
           }
 
@@ -1332,6 +1354,7 @@ IndexStmt SetAssembleStrategy::apply(IndexStmt stmt, string* reason) const {
                 insertedResults.insert(dedupTmp);
 
                 const auto resultName = modeName + "_" + attr.label;
+                cout<<"label: "<<attr.label<<endl;
                 TensorVar queryResult(resultName, Type(Int32, queryDims));
                 epilog = Assignment(queryResult(groupBy),
                                     Cast(dedupTmp(dedupCoords), Int()), Add());
@@ -1361,10 +1384,12 @@ IndexStmt SetAssembleStrategy::apply(IndexStmt stmt, string* reason) const {
       if (util::contains(arguments, op->tensorVar)) {
         expr = Access(op->tensorVar, op->indexVars, op->packageModifiers(),
                       true);
+        cout<<"Argument Access: "<<expr<<endl;
         return;
       } else if (util::contains(temps, op->tensorVar)) {
         expr = Access(tempReplacements[op->tensorVar], op->indexVars,
                       op->packageModifiers());
+        cout<<"Temp Access: "<<expr<<endl;
         return;
       }
 
@@ -1428,7 +1453,19 @@ IndexStmt SetAssembleStrategy::apply(IndexStmt stmt, string* reason) const {
     *reason = queryLowerer.reason;
     return IndexStmt();
   }
-
+  cout<<"result: "<<getResult()<<endl;
+  cout<<"After queryLowerer: "<<loweredQueries<<endl;
+  cout<<"queryResults: "<<endl;
+  for(auto& r: queryResults) {
+    cout<<r.first<<"=>";
+    for(auto& t: r.second) {
+      for(auto& i: t){
+        cout<<i<<",";
+      }
+      cout<<"||";
+    }
+    cout<<endl;
+  }
   // Convert redundant reductions to assignments
   loweredQueries = eliminateRedundantReductions(loweredQueries, 
                                                 &insertedResults);
@@ -1502,6 +1539,7 @@ IndexStmt SetAssembleStrategy::apply(IndexStmt stmt, string* reason) const {
   loweredQueries = InlineTemporaries(insertedResults, 
                                      inlinedResults).rewrite(loweredQueries);
 
+  cout<<"InlineTemporaries: "<<loweredQueries<<endl;
   // Eliminate computation of redundant temporaries
   struct EliminateRedundantTemps : public IndexNotationRewriter {
     using IndexNotationRewriter::visit;
