@@ -618,24 +618,27 @@ TEST(scheduling_eval, spmmCPU) {
 TEST(scheduling_eval, spWorkspace) {
   int NUM_I = 100;
   int NUM_J = 100;
+  int NUM_K = 100;
   float SPARSITY = .03;
-  Format aFormat = COO(2,true,true,false,{0,1});
-  Format bFormat = Format{{Dense,Sparse},{0,1}};
-  Tensor<float> A("A", {NUM_I, NUM_J}, aFormat);
-  Tensor<float> B("B", {NUM_I, NUM_J}, bFormat);
-  Tensor<float> expected("expected", {NUM_I,NUM_J}, {Dense,Dense});
+  Format aFormat = COO(3,true,true,false,{0,1,2});
+  Format bFormat = Format{{Dense,Sparse,Sparse},{0,1,2}};
+  Tensor<float> A("A", {NUM_I, NUM_J,NUM_K}, aFormat);
+  Tensor<float> B("B", {NUM_I, NUM_J,NUM_K}, bFormat);
+  Tensor<float> expected("expected", {NUM_I,NUM_J,NUM_K}, {Dense,Dense,Dense});
   srand(75883);
   for (int i = 0; i < NUM_I; i++) {
     for (int j = 0; j < NUM_J; j++) {
-      float rand_float = (float)rand()/(float)(RAND_MAX);
-      if (rand_float < SPARSITY) {
-        A.insert({i, j}, (float ) ((int) (rand_float*3/SPARSITY)));
+      for (int k = 0; k < NUM_K; k++) {
+        float rand_float = (float) rand() / (float) (RAND_MAX);
+        if (rand_float < SPARSITY) {
+          A.insert({i, j, k}, (float) ((int) (rand_float * 3 / SPARSITY)));
+        }
       }
     }
   }
   A.pack();
 
-  B(i,j) = A(i,j);
+  B(i,j,k) = A(i,j,k);
 
   IndexStmt stmt = B.getAssignment().concretize();
   cout<<"*****"<<endl;
@@ -643,7 +646,7 @@ TEST(scheduling_eval, spWorkspace) {
   B.assemble();
   B.compute();
 
-  expected(i,j) = A(i,j);
+  expected(i,j,k) = A(i,j,k);
   expected.compile();
   expected.assemble();
   expected.compute();
@@ -651,13 +654,14 @@ TEST(scheduling_eval, spWorkspace) {
 }
 
 TEST(scheduling_eval, spWS) {
-  int NUM_I = 100;
-  int NUM_J = 100;
-  int NUM_K = 100;
-  float SPARSITY = .03;
-  Format aFormat = COO(2,true,true,false,{0,1});
-  Format bFormat = Format{{Dense,Sparse},{0,1}};
+  int NUM_I = 50;
+  int NUM_J = 50;
+  int NUM_K = 50;
+  float SPARSITY = .2;
+  Format aFormat = COO(2,true,true,false,{0,1});// order, isUnique, isOrdered, isAoS(array-of-struct), modeOrdering
+  Format bFormat = CSR;
   Format cFormat = CSR;
+  Format wFormat = COO(2,false,false,false,{0,1});
   Tensor<float> A("A",{NUM_I, NUM_J},aFormat);
   Tensor<float> B("B",{NUM_J, NUM_K},bFormat);
   Tensor<float> C("C",{NUM_I, NUM_K},cFormat);
@@ -684,12 +688,20 @@ TEST(scheduling_eval, spWS) {
   B.pack();
 
   C(i, k) = A(i, j) * B(j, k);
-  TensorVar W("W", Type(Float32,{(size_t)NUM_I, (size_t)NUM_K}), {Dense, Dense});
+  //TensorVar W("W", Type(Float32,{(size_t)NUM_I, (size_t)NUM_K}), {Dense, Dense});
+  //TensorVar W("W", Type(Float32,{(size_t)NUM_I, (size_t)NUM_K}), aFormat);
+  TensorVar W("W", Type(Float32,{(size_t)NUM_I, (size_t)NUM_K}), wFormat);
   IndexExpr precomputedExpr = A(i, j) * B(j, k);
   C(i, k) = precomputedExpr;
   IndexStmt stmt = C.getAssignment().concretize();
+  Assignment assign = stmt.as<Forall>().getStmt().as<Forall>().getStmt()
+          .as<Forall>().getStmt().as<Assignment>();
+  TensorVar result = assign.getLhs().getTensorVar();
   IndexVar iw("qi"), kw("qk");
-  stmt = stmt.reorder({i,j,k});
+  //stmt = stmt.reorder({i,j,k});
+  stmt = reorderLoopsTopologically(stmt);
+  //stmt = stmt.reorder({j,i,k});
+  //stmt = stmt.assemble(result, AssembleStrategy::Insert, true);
   stmt = stmt.precompute(precomputedExpr, {i,k}, {iw,kw}, W);
   std::cout<<"*****"<<stmt<<std::endl;
 
@@ -697,15 +709,17 @@ TEST(scheduling_eval, spWS) {
   C.assemble();
   std::cout<<"Compilation over!"<<std::endl;
   C.compute();
-  /*
+
   Tensor<float> expected("expected", {NUM_I, NUM_K}, {Dense, Dense});
   expected(i, k) = A(i, j) * B(j, k);
+  //stmt = expected.getAssignment().concretize();
+  //stmt = scheduleSpGEMMCPU(stmt,false);
   expected.compile();
   expected.assemble();
   expected.compute();
-  */
-  //ASSERT_TENSOR_EQ(expected, C);
-  ASSERT_EQ(1,1);
+
+  ASSERT_TENSOR_EQ(expected, C);
+  //ASSERT_EQ(1,1);
 
 }
 
@@ -756,6 +770,7 @@ TEST_P(spgemm, scheduling_eval) {
   stmt = scheduleSpGEMMCPU(stmt, doPrecompute);
 
   C.compile(stmt);
+  //C.setAssembleWhileCompute(true);
   C.assemble();
   C.compute();
 

@@ -1316,6 +1316,16 @@ IndexStmt SetAssembleStrategy::apply(IndexStmt stmt, string* reason) const {
         cout<<"ModeName: "<<modeName<<endl;
         for (const auto& query:
             modeFormats[i].getAttrQueries(parentCoords, childCoords)) {
+          cout << "ParentCoords: ";
+          for(auto &p : parentCoords) {
+            cout<< p << ",";
+          }
+          cout<<endl;
+          cout << "childCoords: ";
+          for(auto &p : childCoords) {
+            cout<< p << ",";
+          }
+          cout<<endl;
           const auto& groupBy = query.getGroupBy();
           cout<<"Attrs: ";
           for(auto& a: query.getAttrs()) {
@@ -1469,7 +1479,7 @@ IndexStmt SetAssembleStrategy::apply(IndexStmt stmt, string* reason) const {
   // Convert redundant reductions to assignments
   loweredQueries = eliminateRedundantReductions(loweredQueries, 
                                                 &insertedResults);
-
+  cout<<"After reduction-to-assign: "<<loweredQueries<<endl;
   // Inline definitions of temporaries into their corresponding uses, as long 
   // as the temporaries are not the results of reductions
   std::set<TensorVar> inlinedResults;
@@ -1583,7 +1593,7 @@ IndexStmt SetAssembleStrategy::apply(IndexStmt stmt, string* reason) const {
   };
   loweredQueries = 
       EliminateRedundantTemps(inlinedResults).rewrite(loweredQueries);
-
+  cout<<"After temp de-redundancy: "<<loweredQueries<<endl;
   return Assemble(loweredQueries, stmt, queryResults);
 }
 
