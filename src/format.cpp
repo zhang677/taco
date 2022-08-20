@@ -9,6 +9,7 @@
 #include "taco/lower/mode_format_dense.h"
 #include "taco/lower/mode_format_compressed.h"
 #include "taco/lower/mode_format_singleton.h"
+#include "taco/lower/mode_format_coord.h"
 
 #include "taco/error.h"
 #include "taco/util/strings.h"
@@ -50,6 +51,10 @@ Format::Format(const std::vector<ModeFormatPack>& modeFormatPacks,
   taco_uassert(getOrder() <= INT_MAX) << "Supports only INT_MAX modes";
   taco_uassert((size_t)getOrder() == modeOrdering.size()) <<
       "You must either provide a complete mode ordering or none";
+}
+
+Format::Format(bool flag, const std::vector<ModeFormat>& AllFormat, const ModeFormat AccFormat){
+  ;
 }
 
 int Format::getOrder() const {
@@ -384,6 +389,7 @@ ModeFormat ModeFormat::Dense(std::make_shared<DenseModeFormat>());
 ModeFormat ModeFormat::Compressed(std::make_shared<CompressedModeFormat>());
 ModeFormat ModeFormat::Sparse = ModeFormat::Compressed;
 ModeFormat ModeFormat::Singleton(std::make_shared<SingletonModeFormat>());
+ModeFormat ModeFormat::SpCoord(std::make_shared<CoordModeFormat>());
 
 ModeFormat ModeFormat::dense = ModeFormat::Dense;
 ModeFormat ModeFormat::compressed = ModeFormat::Compressed;
@@ -395,6 +401,7 @@ const ModeFormat Compressed = ModeFormat::Compressed;
 const ModeFormat Sparse = ModeFormat::Compressed;
 const ModeFormat Singleton = ModeFormat::Singleton;
 
+
 const ModeFormat dense = ModeFormat::Dense;
 const ModeFormat compressed = ModeFormat::Compressed;
 const ModeFormat sparse = ModeFormat::Compressed;
@@ -404,6 +411,7 @@ const Format CSR({Dense, Sparse}, {0,1});
 const Format CSC({Dense, Sparse}, {1,0});
 const Format DCSR({Sparse, Sparse}, {0,1});
 const Format DCSC({Sparse, Sparse}, {1,0});
+
 
 const Format COO(int order, bool isUnique, bool isOrdered, bool isAoS, 
                  const std::vector<int>& modeOrdering) {

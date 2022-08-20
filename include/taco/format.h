@@ -40,6 +40,9 @@ public:
   Format(const std::vector<ModeFormatPack>& modeFormatPacks,
          const std::vector<int>& modeOrdering);
 
+  /// Format for sparse workspace
+  Format(bool flag, const std::vector<ModeFormat>& AllFormat, const ModeFormat AccFormat);
+
   /// Returns the number of modes in the format.
   int getOrder() const;
 
@@ -87,6 +90,7 @@ public:
   static ModeFormat dense;       /// e.g., first mode in CSR
   static ModeFormat compressed;  /// e.g., second mode in CSR
   static ModeFormat singleton;   /// e.g., second mode in COO
+  static ModeFormat SpCoord;
 
   static ModeFormat sparse;      /// alias for compressed
   static ModeFormat Dense;       /// alias for dense
@@ -190,6 +194,7 @@ extern const ModeFormat Dense;
 extern const ModeFormat Compressed;
 extern const ModeFormat Sparse;
 extern const ModeFormat Singleton;
+extern const ModeFormat SpCoord;
 
 extern const ModeFormat dense;
 extern const ModeFormat compressed;
