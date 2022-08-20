@@ -24,7 +24,7 @@ public:
   /// Generate shims that unpack an array of pointers representing
   /// a mix of taco_tensor_t* and scalars into a function call
   static void generateShim(const Stmt& func, std::stringstream &stream);
-  bool emittingSpWS = true;
+  bool emittingSpWS = false;
 
 protected:
   using IRPrinter::visit;

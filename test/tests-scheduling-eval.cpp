@@ -653,6 +653,7 @@ TEST(scheduling_eval, spWorkspace) {
   ASSERT_TENSOR_EQ(expected, B);
 }
 
+
 TEST(scheduling_eval, spWS) {
   int NUM_I = 50;
   int NUM_J = 50;
@@ -661,7 +662,7 @@ TEST(scheduling_eval, spWS) {
   Format aFormat = COO(2,true,true,false,{0,1});// order, isUnique, isOrdered, isAoS(array-of-struct), modeOrdering
   Format bFormat = CSR;
   Format cFormat = CSR;
-  Format wFormat = COO(2,false,false,false,{0,1});
+  Format wFormat = COO(2,false,false,false,{0,1});//{Dense, Dense};//COO(2,true,true,false,{0,1});// COO(2,false,false,false,{0,1});
   Tensor<float> A("A",{NUM_I, NUM_J},aFormat);
   Tensor<float> B("B",{NUM_J, NUM_K},bFormat);
   Tensor<float> C("C",{NUM_I, NUM_K},cFormat);
@@ -697,13 +698,19 @@ TEST(scheduling_eval, spWS) {
   Assignment assign = stmt.as<Forall>().getStmt().as<Forall>().getStmt()
           .as<Forall>().getStmt().as<Assignment>();
   TensorVar result = assign.getLhs().getTensorVar();
+  std::cout<<"*****"<<stmt<<std::endl;
+  std::cout<<"result: "<<result<<std::endl;
+  IndexStmt packStmt = generatePackCOOStmt(C(i,k).getTensorVar(), C(i,k).getIndexVars(), true);
+  std::cout<<"packStmt: "<<packStmt<<std::endl;
   IndexVar iw("qi"), kw("qk");
   //stmt = stmt.reorder({i,j,k});
   stmt = reorderLoopsTopologically(stmt);
   //stmt = stmt.reorder({j,i,k});
-  //stmt = stmt.assemble(result, AssembleStrategy::Insert, true);
+  stmt = stmt.assemble(C(i,k).getTensorVar(), AssembleStrategy::Insert, true);
   stmt = stmt.precompute(precomputedExpr, {i,k}, {iw,kw}, W);
-  std::cout<<"*****"<<stmt<<std::endl;
+
+
+
 
   C.compile(stmt);
   C.assemble();
