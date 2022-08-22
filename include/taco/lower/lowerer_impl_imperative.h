@@ -596,7 +596,6 @@ private:
   /// Visitor methods can add code to emit it to the function footer.
   std::vector<ir::Stmt> footer;
 
-  bool SpTEST = true;
 
   class Visitor;
   friend class Visitor;

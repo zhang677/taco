@@ -53,7 +53,7 @@ Format::Format(const std::vector<ModeFormatPack>& modeFormatPacks,
       "You must either provide a complete mode ordering or none";
 }
 
-Format::Format(bool flag, const std::vector<ModeFormat>& AllFormat, const ModeFormat AccFormat){
+Format::Format(bool flag, const std::vector<ModeFormat>& AllFormat, const ModeFormat& AccFormat){
   ;
 }
 
@@ -400,7 +400,7 @@ const ModeFormat Dense = ModeFormat::Dense;
 const ModeFormat Compressed = ModeFormat::Compressed;
 const ModeFormat Sparse = ModeFormat::Compressed;
 const ModeFormat Singleton = ModeFormat::Singleton;
-
+const ModeFormat SpCoord = ModeFormat::SpCoord;
 
 const ModeFormat dense = ModeFormat::Dense;
 const ModeFormat compressed = ModeFormat::Compressed;
@@ -411,7 +411,6 @@ const Format CSR({Dense, Sparse}, {0,1});
 const Format CSC({Dense, Sparse}, {1,0});
 const Format DCSR({Sparse, Sparse}, {0,1});
 const Format DCSC({Sparse, Sparse}, {1,0});
-
 
 const Format COO(int order, bool isUnique, bool isOrdered, bool isAoS, 
                  const std::vector<int>& modeOrdering) {
@@ -436,6 +435,21 @@ const Format COO(int order, bool isUnique, bool isOrdered, bool isAoS,
   return modeOrdering.empty() 
          ? Format(modeTypes) 
          : Format(modeTypes, modeOrdering);
+}
+
+const Format WSpace(int order, Format::AccType acc) {
+  std::vector<ModeFormat> modeTypes;
+  modeTypes.push_back(Compressed({true, order == 1 ? ModeFormat::UNIQUE : ModeFormat::NOT_UNIQUE}));
+  if (order > 1) {
+    for (int i = 1; i < order - 1; ++i) {
+      modeTypes.push_back(Singleton({true, ModeFormat::NOT_UNIQUE}));
+    }
+    modeTypes.push_back(Singleton({true, ModeFormat::UNIQUE}));
+  }
+  switch (acc) {
+    case Format::Coord: return Format(true, modeTypes, SpCoord);
+    default: return Format(true, modeTypes, SpCoord);
+  }
 }
 
 bool isDense(const Format& format) {

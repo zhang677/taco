@@ -1007,17 +1007,25 @@ MergeLattice MergeLattice::make(Forall forall, Iterators iterators, ProvenanceGr
   // Can emit merge lattice once underived ancestor can be recovered
   IndexVar indexVar = forall.getIndexVar();
 
+  std::cout<<"IndexVar: "<<indexVar<<std::endl;
+  std::cout<<"whereTempsToResult: "<<std::endl;
+  for(auto& w:whereTempsToResult) {
+    std::cout<<w.first<<"->"<<w.second<<std::endl;
+  }
   MergeLatticeBuilder builder(indexVar, iterators, provGraph, definedIndexVars, whereTempsToResult);
 
   vector<IndexVar> underivedAncestors = provGraph.getUnderivedAncestors(indexVar);
+  std::cout<<"Ancestor: "<<std::endl;
   for (auto ancestor : underivedAncestors) {
+    std::cout<<ancestor<<",";
     if(!provGraph.isRecoverable(ancestor, definedIndexVars)) {
       return MergeLattice({MergePoint({iterators.modeIterator(indexVar)}, {}, {})});
     }
   }
+  std::cout<<std::endl;
 
   MergeLattice lattice = builder.build(forall.getStmt());
-
+  std::cout<<"lattice: "<<lattice<<std::endl;
   // Can't remove points if lattice contains omitters since we lose merge cases during lowering.
   if(lattice.anyModeIteratorIsLeaf() && lattice.needExplicitZeroChecks()) {
     return lattice;

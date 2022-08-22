@@ -41,7 +41,7 @@ public:
          const std::vector<int>& modeOrdering);
 
   /// Format for sparse workspace
-  Format(bool flag, const std::vector<ModeFormat>& AllFormat, const ModeFormat AccFormat);
+  Format(bool flag, const std::vector<ModeFormat>& AllFormat, const ModeFormat& AccFormat);
 
   /// Returns the number of modes in the format.
   int getOrder() const;
@@ -70,6 +70,9 @@ public:
   /// Sets the types of the coordinate arrays for each level
   void setLevelArrayTypes(std::vector<std::vector<Datatype>> levelArrayTypes);
 
+  enum AccType {
+    Coord
+  };
 private:
   std::vector<ModeFormatPack> modeFormatPacks;
   std::vector<int> modeOrdering;
@@ -206,8 +209,11 @@ extern const Format CSC;
 extern const Format DCSR;
 extern const Format DCSC;
 
+
 const Format COO(int order, bool isUnique = true, bool isOrdered = true, 
                  bool isAoS = false, const std::vector<int>& modeOrdering = {});
+
+const Format WSpace(int order, Format::AccType acc);
 /// @}
 
 /// True if all modes are dense.

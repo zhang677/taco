@@ -202,13 +202,16 @@ static std::set<Expr> hasSparseInserts(IndexStmt stmt, Iterators iterators,
                                        ProvenanceGraph provGraph) {
   std::set<Expr> ret;
   std::set<IndexVar> definedIndexVars;
+  std::cout<<"hasSparseInserts:"<<stmt<<std::endl;
 
   match(stmt,
     function<void(const ForallNode*,Matcher*)>([&](const ForallNode* op, 
                                                    Matcher* ctx) {
       definedIndexVars.insert(op->indexVar);
+      std::cout<<(op->stmt)<<std::endl;
       const auto lattice = MergeLattice::make(Forall(op), iterators, 
                                               provGraph, definedIndexVars);
+
       if (any(lattice.iterators(), 
               [](Iterator it){ return !it.isFull() && 
                                       !it.isDimensionIterator(); }) ||
