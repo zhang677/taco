@@ -28,6 +28,7 @@ public:
 
   MergeLattice build(IndexStmt stmt) {
     stmt.accept(this);
+    std::cout<<"Buildlattice:"<<lattice<<std::endl;
     MergeLattice l = lattice;
     lattice = MergeLattice({});
     return l;
@@ -71,7 +72,9 @@ public:
     }
 
     taco_iassert(loc != -1);
+    std::cout<<"Bug"<<std::endl;
     Iterator levelIterator = iterators.levelIterator(ModeAccess(access, loc));
+    std::cout<<"No Bug"<<std::endl;
     return levelIterator;
   }
 
@@ -190,7 +193,7 @@ private:
       lattice = MergeLattice({seenMergePoints.at(access)});
       return;
     }
-
+    
     if (util::contains(latticesOfTemporaries, access->tensorVar)) {
       // If the accessed tensor variable is a temporary with an associated merge
       // lattice then we return that lattice.
@@ -385,9 +388,15 @@ private:
     vector<IndexVar> underivedAncestors = provGraph.getUnderivedAncestors(i);
     set<IndexVar> underivedAncestorsSet = set<IndexVar>(underivedAncestors.begin(), underivedAncestors.end());
     set<Iterator> resultIterators;
+    std::cout<<"lhs indexVars:"<<std::endl;
+    for(auto& i: lhs->indexVars) {
+      std::cout<<i<<",";
+    }
+    std::cout<<std::endl;
     for (auto accessVar : underivedAncestorsSet) {
-      if (lhsUnderivedAncestors.count(accessVar)) {
-        resultIterators.insert(getIterator(lhs, accessVar));
+      if (lhsUnderivedAncestors.find(accessVar)!=lhsUnderivedAncestors.end()) {
+        std::cout<<accessVar<<std::endl;
+        resultIterators.insert(getIterator(lhs, accessVar)); // Bug location!
       }
     }
 
@@ -1006,26 +1015,14 @@ MergeLattice MergeLattice::make(Forall forall, Iterators iterators, ProvenanceGr
 {
   // Can emit merge lattice once underived ancestor can be recovered
   IndexVar indexVar = forall.getIndexVar();
-
-  std::cout<<"IndexVar: "<<indexVar<<std::endl;
-  std::cout<<"whereTempsToResult: "<<std::endl;
-  for(auto& w:whereTempsToResult) {
-    std::cout<<w.first<<"->"<<w.second<<std::endl;
-  }
   MergeLatticeBuilder builder(indexVar, iterators, provGraph, definedIndexVars, whereTempsToResult);
-
   vector<IndexVar> underivedAncestors = provGraph.getUnderivedAncestors(indexVar);
-  std::cout<<"Ancestor: "<<std::endl;
   for (auto ancestor : underivedAncestors) {
-    std::cout<<ancestor<<",";
     if(!provGraph.isRecoverable(ancestor, definedIndexVars)) {
       return MergeLattice({MergePoint({iterators.modeIterator(indexVar)}, {}, {})});
     }
   }
-  std::cout<<std::endl;
-
   MergeLattice lattice = builder.build(forall.getStmt());
-  std::cout<<"lattice: "<<lattice<<std::endl;
   // Can't remove points if lattice contains omitters since we lose merge cases during lowering.
   if(lattice.anyModeIteratorIsLeaf() && lattice.needExplicitZeroChecks()) {
     return lattice;

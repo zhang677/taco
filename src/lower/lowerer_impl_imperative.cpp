@@ -202,13 +202,12 @@ static std::set<Expr> hasSparseInserts(IndexStmt stmt, Iterators iterators,
                                        ProvenanceGraph provGraph) {
   std::set<Expr> ret;
   std::set<IndexVar> definedIndexVars;
-  std::cout<<"hasSparseInserts:"<<stmt<<std::endl;
 
   match(stmt,
     function<void(const ForallNode*,Matcher*)>([&](const ForallNode* op, 
                                                    Matcher* ctx) {
       definedIndexVars.insert(op->indexVar);
-      std::cout<<(op->stmt)<<std::endl;
+      std::cout<<"ForallMatch:"<<(op->stmt)<<std::endl;
       const auto lattice = MergeLattice::make(Forall(op), iterators, 
                                               provGraph, definedIndexVars);
 
@@ -412,6 +411,11 @@ LowererImplImperative::lower(IndexStmt stmt, string name,
   
   // Identify the set of result tensors that must be explicitly initialized
   nonFullyInitializedResults = hasSparseInserts(stmt, iterators, provGraph);
+  std::cout<<"nonFullyInitializedResults:"<<std::endl;
+  for(auto& i: nonFullyInitializedResults) {
+    std::cout<<i<<",";
+  }
+  std::cout<<std::endl;
 
   // Allocate and initialize append and insert mode indices
   Stmt initializeResults = initResultArrays(resultAccesses, reducedAccesses);

@@ -663,7 +663,7 @@ TEST(scheduling_eval, spWS) {
   Format bFormat = CSR;
   Format cFormat = CSR;
   //Format wFormat = COO(2,false,false,false,{0,1});//{Dense, Dense};//COO(2,true,true,false,{0,1});// COO(2,false,false,false,{0,1});
-  Format wFormat = WSpace(3,Format::Coord);
+  Format wFormat = WSpace(2,Format::Coord);
   Tensor<float> A("A",{NUM_I, NUM_J},aFormat);
   Tensor<float> B("B",{NUM_J, NUM_K},bFormat);
   Tensor<float> C("C",{NUM_I, NUM_K},cFormat);
@@ -701,9 +701,9 @@ TEST(scheduling_eval, spWS) {
   TensorVar result = assign.getLhs().getTensorVar();
   std::cout<<"*****"<<stmt<<std::endl;
   //std::cout<<"result: "<<result<<std::endl;
-  IndexStmt packStmt = generatePackCOOStmt(C(i,k).getTensorVar(), C(i,k).getIndexVars(), true);
-  std::cout<<"packStmt: "<<packStmt<<std::endl;
-  IndexVar iw("qi"), kw("qk");
+  //IndexStmt packStmt = generatePackCOOStmt(C(i,k).getTensorVar(), C(i,k).getIndexVars(), true);
+  //std::cout<<"packStmt: "<<packStmt<<std::endl;
+  //IndexVar iw("qi"), kw("qk");
   //stmt = stmt.reorder({i,j,k});
   stmt = reorderLoopsTopologically(stmt);
   //stmt = stmt.reorder({j,i,k});
