@@ -1196,7 +1196,8 @@ IndexStmt SetAssembleStrategy::apply(IndexStmt stmt, string* reason) const {
   }
 
   // FIXME: Unneeded if scalar promotion is made default when concretizing
-  // loweredQueries = scalarPromote(loweredQueries);
+  // GENGHAN: Not exactly. If deleted, scheduling_eval.ttvCPU_CSR will fail
+  loweredQueries = scalarPromote(loweredQueries);
   cout<<"loweredQueries: "<<loweredQueries<<endl;
   // Tracks all tensors that correspond to attribute query results or that are 
   // used to compute attribute queries

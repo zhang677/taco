@@ -1,6 +1,7 @@
 build/
 bin/
 lib/
+buildTest/
 *__pycache__*
 *.swp
 *.swo

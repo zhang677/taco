@@ -172,7 +172,7 @@ IndexStmt scheduleTTMCPU(IndexStmt stmt, Tensor<double> B, int CHUNK_SIZE=16, in
 }
 
 IndexStmt scheduleMTTKRPCPU(IndexStmt stmt, Tensor<double> B, int CHUNK_SIZE=16, int UNROLL_FACTOR=8) {
-  int NUM_J = 100;
+  int NUM_J = 1039/20;
   IndexVar i1("i1"), i2("i2");
 
   IndexExpr precomputeExpr = stmt.as<Forall>().getStmt().as<Forall>().getStmt()
@@ -615,7 +615,7 @@ TEST(scheduling_eval, spmmCPU) {
   ASSERT_TENSOR_EQ(expected, C);
 }
 
-TEST(scheduling_eval, spWorkspace) {
+TEST(DISABLED_scheduling_eval, spWorkspace) {
   int NUM_I = 100;
   int NUM_J = 100;
   int NUM_K = 100;
@@ -661,7 +661,8 @@ TEST(scheduling_eval, spWS) {
   float SPARSITY = .2;
   Format aFormat = COO(2,true,true,false,{0,1});// order, isUnique, isOrdered, isAoS(array-of-struct), modeOrdering
   Format bFormat = CSR;
-  Format cFormat = CSR;
+  //Format cFormat = CSR;
+  Format cFormat = {Dense,Dense};
   //Format wFormat = COO(2,false,false,false,{0,1});//{Dense, Dense};//COO(2,true,true,false,{0,1});// COO(2,false,false,false,{0,1});
   Format wFormat = WSpace(2,Format::Coord);
   Tensor<float> A("A",{NUM_I, NUM_J},aFormat);
@@ -709,7 +710,7 @@ TEST(scheduling_eval, spWS) {
   //stmt = stmt.reorder({j,i,k});
   //stmt = stmt.assemble(C(i,k).getTensorVar(), AssembleStrategy::Insert, true);
   //stmt = stmt.precompute(precomputedExpr, {i,k}, {iw,kw}, W);
-  stmt = stmt.precompute(precomputedExpr, {i,k}, {i,k}, W);
+  //stmt = stmt.precompute(precomputedExpr, {i,k}, {i,k}, W);
   cout<<"stmt: "<<stmt<<endl;
 
 
@@ -792,11 +793,11 @@ TEST_P(spgemm, scheduling_eval) {
 }
 
 INSTANTIATE_TEST_CASE_P(spgemm, spgemm,
-                        Values(//std::make_tuple(CSR, CSR, true),
-                               //std::make_tuple(DCSR, CSR, true),
-                               //std::make_tuple(DCSR, DCSR, true),
-                               std::make_tuple(CSR, CSR, true)));
-                               //std::make_tuple(DCSR, DCSC, true)));
+                        Values(std::make_tuple(CSR, CSR, true),
+                               std::make_tuple(DCSR, CSR, true),
+                               std::make_tuple(DCSR, DCSR, true),
+                               std::make_tuple(CSR, CSR, true),
+                               std::make_tuple(DCSR, DCSC, true)));
 
 TEST(scheduling_eval, spmataddCPU) {
   if (should_use_CUDA_codegen()) {
@@ -1757,7 +1758,7 @@ TEST(scheduling_eval, indexVarSplit) {
   ASSERT_TENSOR_EQ(expected, a);
 }
 
-TEST(generate_evaluation_files, cpu) {
+TEST(generate_evaluation_files, DISABLED_cpu) {
   if (should_use_CUDA_codegen()) {
     return;
   }

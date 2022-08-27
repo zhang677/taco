@@ -659,7 +659,8 @@ Iterator Iterators::levelIterator(ModeAccess modeAccess) const
   //  std::cout<<i.first<<",";
   //}std::cout<<std::endl;
   map<ModeAccess,Iterator> Temp = content->levelIterators;
-  //std::cout << Temp.size() << std::endl;
+  //int sz = Temp.size();
+  std::cout << Temp.size() << std::endl;
   return content->levelIterators.at(modeAccess); // The Wrong map::at
 }
 
