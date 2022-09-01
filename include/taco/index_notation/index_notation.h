@@ -1164,6 +1164,9 @@ public:
   TensorVar(const std::string& name, const Type& type, const Format& format, const Literal& fill = Literal());
   TensorVar(const int &id, const std::string& name, const Type& type, const Format& format,
             const Literal& fill = Literal());
+  TensorVar(const std::string& name, const Type& type, const SpFormat& format, const Literal& fill = Literal());
+  TensorVar(const int &id, const std::string& name, const Type& type, const SpFormat& format,
+            const Literal& fill = Literal());
 
   /// Returns the ID of the tensor variable.
   int getId() const;

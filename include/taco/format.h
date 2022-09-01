@@ -71,7 +71,7 @@ public:
   void setLevelArrayTypes(std::vector<std::vector<Datatype>> levelArrayTypes);
 
   enum AccType {
-    Coord
+    None, Coord
   };
 private:
   std::vector<ModeFormatPack> modeFormatPacks;
@@ -174,6 +174,7 @@ private:
 
 class ModeFormatPack {
 public:
+  ModeFormatPack();
   ModeFormatPack(const std::vector<ModeFormat> modeFormats);
   ModeFormatPack(const std::initializer_list<ModeFormat> modeFormats);
   ModeFormatPack(const ModeFormat modeFormat);
@@ -191,13 +192,24 @@ bool operator!=(const ModeFormatPack&, const ModeFormatPack&);
 std::ostream& operator<<(std::ostream&, const ModeFormatPack&);
 
 
+class SpFormat: public Format{
+public:
+  SpFormat();
+  SpFormat(const Format& format, AccType accType);
+  SpFormat(const std::vector<ModeFormatPack>& modeFormatPacks, AccType accType);
+  SpFormat(const std::vector<ModeFormatPack>& modeFormatPacks, const std::vector<int>& modeOrdering, AccType accType);
+  AccType getAccType();
+private:
+  AccType acc;
+};
+
+
 /// Predefined formats
 /// @{
 extern const ModeFormat Dense;
 extern const ModeFormat Compressed;
 extern const ModeFormat Sparse;
 extern const ModeFormat Singleton;
-extern const ModeFormat SpCoord;
 
 extern const ModeFormat dense;
 extern const ModeFormat compressed;
@@ -212,8 +224,6 @@ extern const Format DCSC;
 
 const Format COO(int order, bool isUnique = true, bool isOrdered = true, 
                  bool isAoS = false, const std::vector<int>& modeOrdering = {});
-
-const Format WSpace(int order, Format::AccType acc);
 /// @}
 
 /// True if all modes are dense.

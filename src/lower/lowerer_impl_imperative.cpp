@@ -302,6 +302,18 @@ LowererImplImperative::lower(IndexStmt stmt, string name,
   // Create iterators
   iterators = Iterators(stmt, tensorVars);
 
+  // Print Iterators
+  std::cout<<"ModeIterators: "<<std::endl;
+  for(auto &modeit: iterators.modeIterators()) {
+    std::cout<<modeit.first<<":"<<modeit.second<<";";
+  }
+  std::cout<<std::endl;
+  std::cout<<"LevelIterators: "<<std::endl;
+  for(auto &modeit: iterators.levelIterators()) {
+    std::cout<<modeit.first<<":"<<modeit.second<<";";
+  }
+  std::cout<<std::endl;
+
   provGraph = ProvenanceGraph(stmt);
 
   for (const IndexVar& indexVar : provGraph.getAllIndexVars()) {
@@ -411,11 +423,6 @@ LowererImplImperative::lower(IndexStmt stmt, string name,
   
   // Identify the set of result tensors that must be explicitly initialized
   nonFullyInitializedResults = hasSparseInserts(stmt, iterators, provGraph);
-  std::cout<<"nonFullyInitializedResults:"<<std::endl;
-  for(auto& i: nonFullyInitializedResults) {
-    std::cout<<i<<",";
-  }
-  std::cout<<std::endl;
 
   // Allocate and initialize append and insert mode indices
   Stmt initializeResults = initResultArrays(resultAccesses, reducedAccesses);
@@ -832,6 +839,7 @@ Stmt LowererImplImperative::lowerForall(Forall forall)
 
     MergePoint point = loopLattice.points()[0];
     Iterator iterator = loopLattice.iterators()[0];
+    std::cout<<"Loop iterators: "<<util::join(loopLattice.iterators(), ", ")<<std::endl;
 
     vector<Iterator> locators = point.locators();
     vector<Iterator> appenders;

@@ -659,12 +659,13 @@ TEST(scheduling_eval, spWS) {
   int NUM_J = 50;
   int NUM_K = 50;
   float SPARSITY = .2;
-  Format aFormat = COO(2,true,true,false,{0,1});// order, isUnique, isOrdered, isAoS(array-of-struct), modeOrdering
+  //Format aFormat = COO(2,true,true,false,{0,1});// order, isUnique, isOrdered, isAoS(array-of-struct), modeOrdering
+  Format aFormat = CSR;
   Format bFormat = CSR;
   //Format cFormat = CSR;
-  Format cFormat = {Dense,Dense};
-  //Format wFormat = COO(2,false,false,false,{0,1});//{Dense, Dense};//COO(2,true,true,false,{0,1});// COO(2,false,false,false,{0,1});
-  Format wFormat = WSpace(2,Format::Coord);
+  Format cFormat = CSR;
+  //Format wFormat = COO(2,true,true,false,{0,1});//{Dense, Dense};//COO(2,true,true,false,{0,1});// COO(2,false,false,false,{0,1});
+  SpFormat wFormat = SpFormat(COO(2,true,true,false,{0,1}), Format::Coord);
   Tensor<float> A("A",{NUM_I, NUM_J},aFormat);
   Tensor<float> B("B",{NUM_J, NUM_K},bFormat);
   Tensor<float> C("C",{NUM_I, NUM_K},cFormat);
@@ -701,16 +702,17 @@ TEST(scheduling_eval, spWS) {
           .as<Forall>().getStmt().as<Assignment>();
   TensorVar result = assign.getLhs().getTensorVar();
   std::cout<<"*****"<<stmt<<std::endl;
+  std::cout<<"wFormat: "<<wFormat<<std::endl;
   //std::cout<<"result: "<<result<<std::endl;
   //IndexStmt packStmt = generatePackCOOStmt(C(i,k).getTensorVar(), C(i,k).getIndexVars(), true);
   //std::cout<<"packStmt: "<<packStmt<<std::endl;
   //IndexVar iw("qi"), kw("qk");
-  //stmt = stmt.reorder({i,j,k});
-  stmt = reorderLoopsTopologically(stmt);
+  stmt = stmt.reorder({i,j,k});
+  //stmt = reorderLoopsTopologically(stmt);
   //stmt = stmt.reorder({j,i,k});
   //stmt = stmt.assemble(C(i,k).getTensorVar(), AssembleStrategy::Insert, true);
   //stmt = stmt.precompute(precomputedExpr, {i,k}, {iw,kw}, W);
-  //stmt = stmt.precompute(precomputedExpr, {i,k}, {i,k}, W);
+  stmt = stmt.precompute(precomputedExpr, {i,k}, {i,k}, W);
   cout<<"stmt: "<<stmt<<endl;
 
 
@@ -793,11 +795,11 @@ TEST_P(spgemm, scheduling_eval) {
 }
 
 INSTANTIATE_TEST_CASE_P(spgemm, spgemm,
-                        Values(std::make_tuple(CSR, CSR, true),
-                               std::make_tuple(DCSR, CSR, true),
-                               std::make_tuple(DCSR, DCSR, true),
-                               std::make_tuple(CSR, CSR, true),
-                               std::make_tuple(DCSR, DCSC, true)));
+                        Values(std::make_tuple(CSR, CSC, true)));//,
+                               //std::make_tuple(DCSR, CSR, true),
+                               //std::make_tuple(DCSR, DCSR, true),
+                               //std::make_tuple(CSR, CSC, false),
+                               //std::make_tuple(DCSR, DCSC, false)));
 
 TEST(scheduling_eval, spmataddCPU) {
   if (should_use_CUDA_codegen()) {

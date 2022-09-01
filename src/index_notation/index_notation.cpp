@@ -2548,6 +2548,7 @@ struct TensorVar::Content {
   Literal fill;
   std::vector<IndexVar> accelIndexVars;
   bool shouldAccel;
+  SpFormat spformat;
 };
 
 TensorVar::TensorVar() : content(nullptr) {
@@ -2573,6 +2574,11 @@ TensorVar::TensorVar(const string& name, const Type& type, const Format& format,
     : TensorVar(-1, name, type, format, fill) {
 }
 
+TensorVar::TensorVar(const std::string& name, const Type& type, const SpFormat& format, const Literal& fill)
+    : TensorVar(-1, name, type, format, fill) {
+
+}
+
 TensorVar::TensorVar(const int& id, const string& name, const Type& type, const Format& format, const Literal& fill)
     : content(new Content) {
   content->id = id;
@@ -2582,7 +2588,26 @@ TensorVar::TensorVar(const int& id, const string& name, const Type& type, const 
   content->fill = fill.defined()? fill : Literal::zero(type.getDataType());
   content->accelIndexVars = std::vector<IndexVar> {};
   content->shouldAccel = true;
+  content->spformat = SpFormat(format,Format::None);
 }
+
+TensorVar::TensorVar(const int &id, const std::string& name, const Type& type, const SpFormat& format, const Literal& fill)
+    : content(new Content) {
+  content->id = id;
+  content->name = name;
+  content->type = type;
+  std::vector<ModeFormatPack> pack;
+  for (int i=0; i<format.getOrder(); i++){
+    pack.push_back(Dense);
+  }
+  content->format = Format(pack);
+  content->fill = fill.defined()? fill : Literal::zero(type.getDataType());
+  content->accelIndexVars = std::vector<IndexVar> {};
+  content->shouldAccel = true;
+  content->spformat = format;
+}
+
+
 
 int TensorVar::getId() const {
   return content->id;

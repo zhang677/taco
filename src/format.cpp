@@ -9,7 +9,6 @@
 #include "taco/lower/mode_format_dense.h"
 #include "taco/lower/mode_format_compressed.h"
 #include "taco/lower/mode_format_singleton.h"
-#include "taco/lower/mode_format_coord.h"
 
 #include "taco/error.h"
 #include "taco/util/strings.h"
@@ -337,6 +336,9 @@ std::ostream& operator<<(std::ostream& os, const ModeFormat& modeFormat) {
 
 
 // class ModeTypePack
+ModeFormatPack::ModeFormatPack() {
+}
+
 ModeFormatPack::ModeFormatPack(const std::vector<ModeFormat> modeFormats)
     : modeFormats(modeFormats) {
   for (const auto& modeFormat : modeFormats) {
@@ -389,7 +391,6 @@ ModeFormat ModeFormat::Dense(std::make_shared<DenseModeFormat>());
 ModeFormat ModeFormat::Compressed(std::make_shared<CompressedModeFormat>());
 ModeFormat ModeFormat::Sparse = ModeFormat::Compressed;
 ModeFormat ModeFormat::Singleton(std::make_shared<SingletonModeFormat>());
-ModeFormat ModeFormat::SpCoord(std::make_shared<CoordModeFormat>());
 
 ModeFormat ModeFormat::dense = ModeFormat::Dense;
 ModeFormat ModeFormat::compressed = ModeFormat::Compressed;
@@ -400,7 +401,6 @@ const ModeFormat Dense = ModeFormat::Dense;
 const ModeFormat Compressed = ModeFormat::Compressed;
 const ModeFormat Sparse = ModeFormat::Compressed;
 const ModeFormat Singleton = ModeFormat::Singleton;
-const ModeFormat SpCoord = ModeFormat::SpCoord;
 
 const ModeFormat dense = ModeFormat::Dense;
 const ModeFormat compressed = ModeFormat::Compressed;
@@ -437,21 +437,6 @@ const Format COO(int order, bool isUnique, bool isOrdered, bool isAoS,
          : Format(modeTypes, modeOrdering);
 }
 
-const Format WSpace(int order, Format::AccType acc) {
-  std::vector<ModeFormat> modeTypes;
-  modeTypes.push_back(Compressed({true, order == 1 ? ModeFormat::UNIQUE : ModeFormat::NOT_UNIQUE}));
-  if (order > 1) {
-    for (int i = 1; i < order - 1; ++i) {
-      modeTypes.push_back(Singleton({true, ModeFormat::NOT_UNIQUE}));
-    }
-    modeTypes.push_back(Singleton({true, ModeFormat::UNIQUE}));
-  }
-  switch (acc) {
-    case Format::Coord: return Format(true, modeTypes, SpCoord);
-    default: return Format(true, modeTypes, SpCoord);
-  }
-}
-
 bool isDense(const Format& format) {
   for (ModeFormat modeFormat : format.getModeFormats()) {
     if (modeFormat != Dense) {
@@ -460,5 +445,23 @@ bool isDense(const Format& format) {
   }
   return true;
 }
+
+// class SpFormat
+SpFormat::SpFormat() {
+}
+
+SpFormat::SpFormat(const Format &format, AccType accType): Format(format),acc(accType) {
+  ;
+}
+
+SpFormat::SpFormat(const std::vector<ModeFormatPack> &modeFormatPacks, Format::AccType accType): Format(modeFormatPacks), acc(accType){
+  ;
+}
+SpFormat::SpFormat(const std::vector<ModeFormatPack> &modeFormatPacks, const std::vector<int>& modeOrdering, Format::AccType accType): Format(modeFormatPacks), acc(accType){
+  ;
+}
+Format::AccType SpFormat::getAccType() { return this->acc;}
+
+
 
 }

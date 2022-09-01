@@ -72,9 +72,7 @@ public:
     }
 
     taco_iassert(loc != -1);
-    std::cout<<"Bug"<<std::endl;
     Iterator levelIterator = iterators.levelIterator(ModeAccess(access, loc));
-    std::cout<<"No Bug"<<std::endl;
     return levelIterator;
   }
 
