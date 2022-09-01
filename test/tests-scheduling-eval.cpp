@@ -663,9 +663,9 @@ TEST(scheduling_eval, spWS) {
   Format aFormat = CSR;
   Format bFormat = CSR;
   //Format cFormat = CSR;
-  Format cFormat = CSR;
-  //Format wFormat = COO(2,true,true,false,{0,1});//{Dense, Dense};//COO(2,true,true,false,{0,1});// COO(2,false,false,false,{0,1});
-  SpFormat wFormat = SpFormat(COO(2,true,true,false,{0,1}), Format::Coord);
+  Format cFormat = COO(2,true,true,false,{0,1});
+  Format wFormat = COO(2,true,true,false,{0,1});//{Dense, Dense};//COO(2,true,true,false,{0,1});// COO(2,false,false,false,{0,1});
+  //SpFormat wFormat = SpFormat(COO(2,true,true,false,{0,1}), Format::Coord);
   Tensor<float> A("A",{NUM_I, NUM_J},aFormat);
   Tensor<float> B("B",{NUM_J, NUM_K},bFormat);
   Tensor<float> C("C",{NUM_I, NUM_K},cFormat);

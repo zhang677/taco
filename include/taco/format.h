@@ -70,9 +70,6 @@ public:
   /// Sets the types of the coordinate arrays for each level
   void setLevelArrayTypes(std::vector<std::vector<Datatype>> levelArrayTypes);
 
-  enum AccType {
-    None, Coord
-  };
 private:
   std::vector<ModeFormatPack> modeFormatPacks;
   std::vector<int> modeOrdering;
@@ -194,6 +191,9 @@ std::ostream& operator<<(std::ostream&, const ModeFormatPack&);
 
 class SpFormat: public Format{
 public:
+  enum AccType {
+    None, Coord
+  };
   SpFormat();
   SpFormat(const Format& format, AccType accType);
   SpFormat(const std::vector<ModeFormatPack>& modeFormatPacks, AccType accType);

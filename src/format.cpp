@@ -454,13 +454,13 @@ SpFormat::SpFormat(const Format &format, AccType accType): Format(format),acc(ac
   ;
 }
 
-SpFormat::SpFormat(const std::vector<ModeFormatPack> &modeFormatPacks, Format::AccType accType): Format(modeFormatPacks), acc(accType){
+SpFormat::SpFormat(const std::vector<ModeFormatPack> &modeFormatPacks, AccType accType): Format(modeFormatPacks), acc(accType){
   ;
 }
-SpFormat::SpFormat(const std::vector<ModeFormatPack> &modeFormatPacks, const std::vector<int>& modeOrdering, Format::AccType accType): Format(modeFormatPacks), acc(accType){
+SpFormat::SpFormat(const std::vector<ModeFormatPack> &modeFormatPacks, const std::vector<int>& modeOrdering, AccType accType): Format(modeFormatPacks), acc(accType){
   ;
 }
-Format::AccType SpFormat::getAccType() { return this->acc;}
+SpFormat::AccType SpFormat::getAccType() { return this->acc;}
 
 
 
