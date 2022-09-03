@@ -1196,6 +1196,9 @@ public:
   /// Gets the acceleration flag
   bool getShouldAccel() const;
 
+  /// Gets the accType
+  SpFormat::AccType getAccType() const;
+
   /// Set the acceleration dimensions
   void setAccelIndexVars(const std::vector<IndexVar>& accelIndexVars, bool shouldAccel);
 

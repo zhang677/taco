@@ -543,6 +543,17 @@ private:
   /// Map from result tensors to variables tracking values array capacity.
   std::map<ir::Expr, ir::Expr> capacityVars;
 
+  /// Map from sparse workspace tensors to variables tracking size and capacity.
+  /// Different from whereTotemp, where statement may be the outer-most stmt.
+  std::map<TensorVar, ir::Expr> spAccSize;
+  std::map<TensorVar, ir::Expr> spAccCapacity;
+  std::map<TensorVar, std::vector<ir::Expr>> spAllcrd;
+  std::map<TensorVar, ir::Expr> spAllvals;
+  std::map<TensorVar, ir::Expr> spAllSize;
+  std::map<TensorVar, ir::Expr> spAllCapacity;
+  std::map<TensorVar, ir::Expr> spInsertFail;
+  void createSpAssistVars(const std::set<TensorVar>&);
+
   /// Map from index variables to their dimensions, currently [0, expr).
   std::map<IndexVar, ir::Expr> dimensions;
 
@@ -596,6 +607,14 @@ private:
   /// Visitor methods can add code to emit it to the function footer.
   std::vector<ir::Stmt> footer;
 
+  /// Flag for sparse workspace: TemporaryVar -> bool
+  std::set<TensorVar> spTemporaryVars;
+
+  /// Set the sparse workspace flags
+  void setSpWorkspace(const std::vector<TensorVar>& temporary);
+
+  /// Initialize a sparse workspace
+  std::vector<ir::Stmt> codeToInitializeSpTemporary(Where where);
 
   class Visitor;
   friend class Visitor;

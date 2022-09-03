@@ -292,7 +292,7 @@ void CodeGen_C::visit(const Function* func) {
     out << "#ifndef TACO_GENERATED_" << func->name << "\n";
     out << "#define TACO_GENERATED_" << func->name << "\n";
   }
-  if (IsFirst && outputKind == ImplementationGen && emittingSpWS && !(func->wsvars).empty()) {
+  if (IsFirst && outputKind == ImplementationGen && !(func->wsvars).empty()) {
     out << printWsFuncs(func->wsvars) << endl;
     IsFirst = false;
   }

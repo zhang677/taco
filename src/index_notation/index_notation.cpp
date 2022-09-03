@@ -2658,6 +2658,10 @@ bool TensorVar::getShouldAccel() const {
   return content->shouldAccel;
 }
 
+SpFormat::AccType TensorVar::getAccType() const {
+  return content->spformat.getAccType();
+}
+
 void TensorVar::setAccelIndexVars(const std::vector<IndexVar>& accelIndexVars, bool shouldAccel) {
   content->shouldAccel = shouldAccel;
   content->accelIndexVars = accelIndexVars;

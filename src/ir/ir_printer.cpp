@@ -115,6 +115,9 @@ void IRPrinter::visit(const Literal* op) {
       stream << val.real() << " + I*" << val.imag();
     }
     break;
+    case Datatype::UserDefined:
+      taco_not_supported_yet;
+      break;
     case Datatype::Undefined:
       taco_ierror << "Undefined type in IR";
     break;

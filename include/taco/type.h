@@ -32,6 +32,7 @@ public:
     Float64,
     Complex64,
     Complex128,
+    UserDefined,
     Undefined  /// Undefined type
   };
 
@@ -39,10 +40,13 @@ public:
   Datatype();
 
   /// Construct a taco basic type with default bit widths.
-  Datatype(Kind);
+  Datatype(Kind, std::string name="");
 
   /// Return the kind of type this object represents.
   Kind getKind() const;
+
+  /// Return the name of user-defined type.
+  std::string getName() const;
 
   /// Functions that return true if the type is the given type.
   /// @{
@@ -51,6 +55,7 @@ public:
   bool isFloat() const;
   bool isComplex() const;
   bool isBool() const;
+  bool isUdf() const;
   /// @}
 
   /// Returns the number of bytes required to store one element of this type.
@@ -61,6 +66,7 @@ public:
 
 private:
   Kind kind;
+  std::string name;
 };
 
 std::ostream& operator<<(std::ostream&, const Datatype&);
@@ -87,6 +93,7 @@ extern Datatype Float64;
 Datatype Complex(int bits);
 extern Datatype Complex64;
 extern Datatype Complex128;
+Datatype UserDefined(std::string name);
 
 Datatype max_type(Datatype a, Datatype b);
 

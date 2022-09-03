@@ -232,6 +232,31 @@ static std::set<Expr> hasSparseInserts(IndexStmt stmt, Iterators iterators,
   return ret;
 }
 
+void LowererImplImperative::createSpAssistVars(const std::set<TensorVar>& tensorVars) {
+  for (auto& tensor : tensorVars) {
+    this->spAccCapacity.insert({tensor, Var::make(tensor.getName() + "_accumulator_capacity", Int32)});
+    this->spAccSize.insert({tensor, Var::make(tensor.getName() + "_accumulator_size", Int32)});
+    this->spAllSize.insert({tensor, Var::make(tensor.getName()+"_all_size", Int32)});
+    this->spAllCapacity.insert({tensor, Var::make(tensor.getName()+"_all_capacity", Int32)});
+    std::vector<Expr> Allcrd;
+    for(int i = 0; i < tensor.getOrder(); i++) {
+      Allcrd.push_back(Var::make(tensor.getName()+ to_string(i+1) + "_crd", Int32, true, false));
+    }
+    this->spAllcrd.insert({tensor, Allcrd});
+    this->spAllvals.insert({tensor, Var::make(tensor.getName() + "_val", tensor.getType().getDataType(), true, false)});
+    this->spInsertFail.insert({tensor, Var::make(tensor.getName() + "_insertFail", Bool, true, false)});
+  }
+}
+
+/// Set the sparse workspace flags
+void LowererImplImperative::setSpWorkspace(const std::vector<TensorVar>& temporary){
+  for (auto& temp: temporary) {
+    if(temp.getAccType()!=SpFormat::None) {
+      this->spTemporaryVars.insert(temp);
+    }
+  }
+}
+
 Stmt
 LowererImplImperative::lower(IndexStmt stmt, string name,
                    bool assemble, bool compute, bool pack, bool unpack)
@@ -246,6 +271,7 @@ LowererImplImperative::lower(IndexStmt stmt, string name,
   vector<TensorVar> results = getResults(stmt);
   vector<TensorVar> arguments = getArguments(stmt);
   vector<TensorVar> temporaries = getTemporaries(stmt);
+  setSpWorkspace(temporaries);
 
   needCompute = {};
   if (generateAssembleCode()) {
@@ -298,6 +324,9 @@ LowererImplImperative::lower(IndexStmt stmt, string name,
 
   // Create variables for keeping track of result values array capacity
   createCapacityVars(resultVars, &capacityVars);
+
+  // Create variables to assist accumulator
+  createSpAssistVars(spTemporaryVars);
 
   // Create iterators
   iterators = Iterators(stmt, tensorVars);
@@ -461,7 +490,7 @@ LowererImplImperative::lower(IndexStmt stmt, string name,
     type << resAccess.getTensorVar().getType().getDataType();
     std::string dType;
     type >> dType;
-    if (mode > 1) {
+    if (mode > 1 && resAccess.getTensorVar().getAccType()!=SpFormat::None) {
       wsvars.insert({name, {mode, dType}});
     }
   }
@@ -825,13 +854,17 @@ Stmt LowererImplImperative::lowerForall(Forall forall)
   vector<Stmt> temporaryValuesInitFree = {Stmt(), Stmt()};
   auto temp = temporaryInitialization.find(forall);
   if (temp != temporaryInitialization.end() && forall.getParallelUnit() ==
-      ParallelUnit::NotParallel && !isScalar(temp->second.getTemporary().getType()))
+                                               ParallelUnit::NotParallel && !isScalar(temp->second.getTemporary().getType()))
     temporaryValuesInitFree = codeToInitializeTemporary(temp->second);
   else if (temp != temporaryInitialization.end() && forall.getParallelUnit() ==
-           ParallelUnit::CPUThread && !isScalar(temp->second.getTemporary().getType())) {
+                                                    ParallelUnit::CPUThread && !isScalar(temp->second.getTemporary().getType())) {
     temporaryValuesInitFree = codeToInitializeTemporaryParallel(temp->second, forall.getParallelUnit());
   }
 
+
+
+  std::cout<<"temporaryValuesInit: "<<std::endl;
+  std::cout<<temporaryValuesInitFree[0];
   Stmt loops;
   // Emit a loop that iterates over over a single iterator (optimization)
   if (caseLattice.iterators().size() == 1 && caseLattice.iterators()[0].isUnique()) {
@@ -2528,20 +2561,26 @@ vector<Stmt> LowererImplImperative::codeToInitializeTemporary(Where where) {
     Expr values;
     if (util::contains(needCompute, temporary) &&
         needComputeValues(where, temporary)) {
-      values = ir::Var::make(temporary.getName(),
-                             temporary.getType().getDataType(), true, false);
+      if(temporary.getAccType()==SpFormat::None) {
+        values = ir::Var::make(temporary.getName(),
+                               temporary.getType().getDataType(), true, false);
 
-      Expr size = getTemporarySize(where);
+        Expr size = getTemporarySize(where);
 
-      // no decl needed for shared memory
-      Stmt decl = Stmt();
-      if ((isa<Forall>(where.getProducer()) && inParallelLoopDepth == 0) || !should_use_CUDA_codegen()) {
-        decl = VarDecl::make(values, ir::Literal::make(0));
+        // no decl needed for shared memory
+        Stmt decl = Stmt();
+        if ((isa<Forall>(where.getProducer()) && inParallelLoopDepth == 0) || !should_use_CUDA_codegen()) {
+          decl = VarDecl::make(values, ir::Literal::make(0));
+        }
+        Stmt allocate = Allocate::make(values, size);
+
+        freeTemporary = Block::make(freeTemporary, Free::make(values));
+        initializeTemporary = Block::make(decl, initializeTemporary, allocate);
+      } else {
+        vector<Stmt> temporaryValuesInitFree = codeToInitializeSpTemporary(where);
+        initializeTemporary = temporaryValuesInitFree[0];
+        freeTemporary = temporaryValuesInitFree[1];
       }
-      Stmt allocate = Allocate::make(values, size);
-
-      freeTemporary = Block::make(freeTemporary, Free::make(values));
-      initializeTemporary = Block::make(decl, initializeTemporary, allocate);
     }
 
     /// Make a struct object that lowerAssignment and lowerAccess can read
@@ -2550,8 +2589,70 @@ vector<Stmt> LowererImplImperative::codeToInitializeTemporary(Where where) {
     arrays.values = values;
     this->temporaryArrays.insert({temporary, arrays});
   }
+
+
   return {initializeTemporary, freeTemporary};
 }
+
+vector<Stmt> LowererImplImperative::codeToInitializeSpTemporary(Where where){
+  TensorVar temporary = where.getTemporary();
+  taco_iassert(temporary.getAccType()!=SpFormat::None && !isScalar(temporary.getType()));
+
+  Stmt freeTemporary = Stmt();
+  Stmt initializeTemporary = Stmt();
+  const std::string accName = temporary.getName() + "_accumulator";
+
+  // Name of point struct depends on the codegen: item.first+"space"
+  const std::string pointSuffix = "space";
+  const std::string pointName = temporary.getName() + pointSuffix;
+  const Datatype pointType = UserDefined(pointName);
+  const Expr accArr = ir::Var::make(accName, pointType, true, false);
+
+  Stmt accCapacityDecl = VarDecl::make(spAccCapacity[temporary], ir::Literal::make(1<<20));
+  Stmt accSizeDecl = VarDecl::make(spAccSize[temporary], ir::Literal::make(0));
+  Stmt accArrDecl = VarDecl::make(accArr, ir::Literal::make(0));
+  Stmt allocAccArr = Allocate::make(accArr, spAccCapacity[temporary]);
+
+  Stmt allCapacityDecl = VarDecl::make(spAllCapacity[temporary], spAccCapacity[temporary]);
+  Stmt allSizeDecl = VarDecl::make(spAllSize[temporary], ir::Literal::make(0));
+  vector<Stmt> allCrdsDecl;
+  vector<Stmt> allocAllCrds;
+  for (int i = 0; i < temporary.getOrder(); i++) {
+    allCrdsDecl.push_back(VarDecl::make(spAllcrd[temporary][i], ir::Literal::make(0)));
+    allocAllCrds.push_back(Allocate::make(spAllcrd[temporary][i], spAllCapacity[temporary]));
+  }
+  Stmt allValDecl = VarDecl::make(spAllvals[temporary], ir::Literal::make(0));
+  Stmt allocAllVal = Allocate::make(spAllvals[temporary], spAllCapacity[temporary]);
+
+  Stmt insertFailDecl = VarDecl::make(spInsertFail[temporary], ir::Literal::make(0));
+  Stmt allocInsertFailDecl = Allocate::make(spInsertFail[temporary], ir::Literal::make(1));
+  Stmt initInsertFailDecl = Store::make(spInsertFail[temporary],ir::Literal::make(0),ir::Literal::make(false));
+
+  Stmt initSpWS = Stmt();
+  if (temporary.getAccType() == SpFormat::Hash) {
+    ir::Call::make("init_"+pointName, {accArr,ir::Literal::make(0),spAccCapacity[temporary]}, Bool);
+  }
+
+  vector<Stmt> Stmts = {accCapacityDecl,accSizeDecl,accArrDecl,allocAccArr,
+                           allCapacityDecl,allSizeDecl};
+  Stmts.insert(Stmts.end(), allCrdsDecl.begin(), allCrdsDecl.end());
+  Stmts.insert(Stmts.end(), allocAllCrds.begin(), allocAllCrds.end());
+  Stmts.insert(Stmts.end(), {allValDecl, allocAllVal, insertFailDecl, allocInsertFailDecl, initInsertFailDecl,
+                                     initSpWS});
+
+  Stmt initializeSpTemporary = Block::make(Stmts);
+
+  Stmts.clear();
+  Stmts = {Free::make(accArr), Free::make(spAllvals[temporary]), Free::make(spInsertFail[temporary])};
+  for(int i = 0; i < temporary.getOrder(); i++) {
+    Stmts.push_back(Free::make(spAllcrd[temporary][i]));
+  }
+
+  Stmt freeSpTemporary = Block::make(Stmts);
+
+  return {initializeSpTemporary, freeSpTemporary};
+}
+
 
 Stmt LowererImplImperative::lowerWhere(Where where) {
   TensorVar temporary = where.getTemporary();

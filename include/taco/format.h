@@ -192,7 +192,7 @@ std::ostream& operator<<(std::ostream&, const ModeFormatPack&);
 class SpFormat: public Format{
 public:
   enum AccType {
-    None, Coord
+    None, Coord, Hash
   };
   SpFormat();
   SpFormat(const Format& format, AccType accType);

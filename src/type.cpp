@@ -13,14 +13,18 @@ using namespace std;
 
 namespace taco {
 
-Datatype::Datatype() : kind(Undefined) {
+Datatype::Datatype() : kind(Undefined), name("") {
 }
 
-Datatype::Datatype(Kind kind) : kind(kind) {
+Datatype::Datatype(Kind kind, std::string name) : kind(kind), name(name) {
 }
 
 Datatype::Kind Datatype::getKind() const {
   return this->kind;
+}
+
+std::string Datatype::getName() const {
+  return this->name;
 }
 
 bool Datatype::isBool() const {
@@ -43,6 +47,10 @@ bool Datatype::isFloat() const {
 
 bool Datatype::isComplex() const {
   return getKind() == Complex64 || getKind() == Complex128;
+}
+
+bool Datatype::isUdf() const {
+  return getKind() == UserDefined;
 }
   
 Datatype max_type(Datatype a, Datatype b) {
@@ -118,6 +126,7 @@ std::ostream& operator<<(std::ostream& os, const Datatype& type) {
   else if (type == Datatype::Float64) os << "double";
   else if (type == Datatype::Complex64) os << "float complex";
   else if (type == Datatype::Complex128) os << "double complex";
+  else if (type == Datatype::UserDefined) os << type.getName();
   else os << "Undefined";
   return os;
 }
@@ -139,6 +148,7 @@ std::ostream& operator<<(std::ostream& os, const Datatype::Kind& kind) {
     case Datatype::Float64: os << "Float64"; break;
     case Datatype::Complex64: os << "Complex64"; break;
     case Datatype::Complex128: os << "Complex128"; break;
+    case Datatype::UserDefined: os << "Undefined"; break;
     case Datatype::Undefined: os << "Undefined"; break;
   }
   return os;
@@ -217,6 +227,10 @@ Datatype Complex(int bits) {
   
 Datatype Complex64  = Datatype(Datatype::Complex64);
 Datatype Complex128 = Datatype(Datatype::Complex128);
+
+Datatype UserDefined(std::string name) {
+  return Datatype(Datatype::UserDefined, name);
+}
 
 struct Dimension::Content {
   size_t size;

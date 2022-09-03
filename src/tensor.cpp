@@ -1142,6 +1142,9 @@ bool equals(const TensorBase& a, const TensorBase& b) {
     case Datatype::Float64: return equalsTyped<double>(a, b);
     case Datatype::Complex64: return equalsTyped<std::complex<float>>(a, b);
     case Datatype::Complex128: return equalsTyped<std::complex<double>>(a, b);
+    case Datatype::UserDefined:
+      taco_not_supported_yet;
+      break;
     case Datatype::Undefined: taco_ierror << "Undefined data type";
   }
   taco_unreachable;

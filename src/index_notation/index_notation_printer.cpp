@@ -79,6 +79,9 @@ void IndexNotationPrinter::visit(const LiteralNode* op) {
     case Datatype::Complex128:
       os << op->getVal<std::complex<double>>();
       break;
+    case Datatype::UserDefined:
+      taco_not_supported_yet;
+      break;
     case Datatype::Undefined:
       break;
   }

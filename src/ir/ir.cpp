@@ -97,6 +97,9 @@ Expr Literal::zero(Datatype datatype) {
     case Datatype::Complex128:
       zero = Literal::make(std::complex<double>());
       break;
+    case Datatype::UserDefined:
+      taco_not_supported_yet;
+      break;
     case Datatype::Undefined:
       taco_ierror;
       break;
@@ -236,6 +239,9 @@ bool Literal::equalsScalar(double scalar) const {
     case Datatype::Complex128:
       return compare<std::complex<double>>(this, scalar);
     break;
+    case Datatype::UserDefined:
+      taco_not_supported_yet;
+      break;
     case Datatype::Undefined:
       taco_not_supported_yet;
     break;
