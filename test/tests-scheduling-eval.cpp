@@ -665,7 +665,8 @@ TEST(scheduling_eval, spWS) {
   Format cFormat = CSR;
   //Format cFormat = COO(2,true,true,false,{0,1});
   //Format wFormat = COO(2,true,true,false,{0,1});//{Dense, Dense};//COO(2,true,true,false,{0,1});// COO(2,false,false,false,{0,1});
-  SpFormat wFormat = SpFormat(COO(2,true,true,false,{0,1}), SpFormat::Coord);
+  //SpFormat wFormat = SpFormat(COO(2,true,true,false,{0,1}), SpFormat::Coord);
+  SpFormat wFormat = SpFormat({Dense,Dense},{0,1}, SpFormat::Coord);
   Tensor<float> A("A",{NUM_I, NUM_J},aFormat);
   Tensor<float> B("B",{NUM_J, NUM_K},bFormat);
   Tensor<float> C("C",{NUM_I, NUM_K},cFormat);
@@ -715,8 +716,6 @@ TEST(scheduling_eval, spWS) {
   stmt = stmt.precompute(precomputedExpr, {i,k}, {i,k}, W);
   cout<<"stmt: "<<stmt<<endl;
 
-
-
   C.compile(stmt);
   C.assemble();
   std::cout<<"Compilation over!"<<std::endl;
@@ -724,6 +723,7 @@ TEST(scheduling_eval, spWS) {
 
   Tensor<float> expected("expected", {NUM_I, NUM_K}, {Dense, Dense});
   expected(i, k) = A(i, j) * B(j, k);
+  stmt = expected.getAssignment().concretize();
   //stmt = expected.getAssignment().concretize();
   //stmt = scheduleSpGEMMCPU(stmt,false);
   expected.compile();

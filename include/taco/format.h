@@ -198,7 +198,7 @@ public:
   SpFormat(const Format& format, AccType accType);
   SpFormat(const std::vector<ModeFormatPack>& modeFormatPacks, AccType accType);
   SpFormat(const std::vector<ModeFormatPack>& modeFormatPacks, const std::vector<int>& modeOrdering, AccType accType);
-  AccType getAccType();
+  AccType getAccType() const;
 private:
   AccType acc;
 };

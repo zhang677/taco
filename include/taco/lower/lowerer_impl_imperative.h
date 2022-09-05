@@ -552,7 +552,14 @@ private:
   std::map<TensorVar, ir::Expr> spAllSize;
   std::map<TensorVar, ir::Expr> spAllCapacity;
   std::map<TensorVar, ir::Expr> spInsertFail;
+  std::map<TensorVar, ir::Expr> spPoint;
+  std::map<TensorVar, std::vector<ir::Expr>> spDims; // To adjust to the current declLocatePosVars
   void createSpAssistVars(const std::set<TensorVar>&);
+
+  /// Forall loop depth of producer side
+  int producerForallDepth = -1;
+  int SpPointDepth = -1;
+  bool inProducer = false;
 
   /// Map from index variables to their dimensions, currently [0, expr).
   std::map<IndexVar, ir::Expr> dimensions;
@@ -607,7 +614,7 @@ private:
   /// Visitor methods can add code to emit it to the function footer.
   std::vector<ir::Stmt> footer;
 
-  /// Flag for sparse workspace: TemporaryVar -> bool
+  /// Flag for sparse workspace: TemporaryVar
   std::set<TensorVar> spTemporaryVars;
 
   /// Set the sparse workspace flags

@@ -236,8 +236,8 @@ void LowererImplImperative::createSpAssistVars(const std::set<TensorVar>& tensor
   for (auto& tensor : tensorVars) {
     this->spAccCapacity.insert({tensor, Var::make(tensor.getName() + "_accumulator_capacity", Int32)});
     this->spAccSize.insert({tensor, Var::make(tensor.getName() + "_accumulator_size", Int32)});
-    this->spAllSize.insert({tensor, Var::make(tensor.getName()+"_all_size", Int32)});
-    this->spAllCapacity.insert({tensor, Var::make(tensor.getName()+"_all_capacity", Int32)});
+    this->spAllSize.insert({tensor, Var::make(tensor.getName() + "_all_size", Int32)});
+    this->spAllCapacity.insert({tensor, Var::make(tensor.getName() + "_all_capacity", Int32)});
     std::vector<Expr> Allcrd;
     for(int i = 0; i < tensor.getOrder(); i++) {
       Allcrd.push_back(Var::make(tensor.getName()+ to_string(i+1) + "_crd", Int32, true, false));
@@ -245,6 +245,12 @@ void LowererImplImperative::createSpAssistVars(const std::set<TensorVar>& tensor
     this->spAllcrd.insert({tensor, Allcrd});
     this->spAllvals.insert({tensor, Var::make(tensor.getName() + "_val", tensor.getType().getDataType(), true, false)});
     this->spInsertFail.insert({tensor, Var::make(tensor.getName() + "_insertFail", Bool, true, false)});
+    this->spPoint.insert({tensor, Var::make(tensor.getName() + "_point", Int32, true, false)});
+    Allcrd.clear();
+    for(int i = 0; i < tensor.getOrder(); i++) {
+      Allcrd.push_back(Var::make(tensor.getName() + to_string(i+1) + "_dimension", Int32));
+    }
+    this->spDims.insert({tensor, Allcrd});
   }
 }
 
@@ -480,7 +486,7 @@ LowererImplImperative::lower(IndexStmt stmt, string name,
     }
   }
 
-
+  // Add sparse workspace tensor variables
   vector<Access> tempAccesses = getTemporaryAccesses(stmt);
   std::map<std::string,std::pair<int,std::string>> wsvars;
   for (auto& resAccess: tempAccesses) {
@@ -493,6 +499,10 @@ LowererImplImperative::lower(IndexStmt stmt, string name,
     if (mode > 1 && resAccess.getTensorVar().getAccType()!=SpFormat::None) {
       wsvars.insert({name, {mode, dType}});
     }
+  }
+
+  if(!wsvars.empty() && this->assemble) {
+    return Function::make(name, resultsIR, argumentsIR, Block::blanks(Stmt()),wsvars);
   }
 
   // Create function
@@ -714,6 +724,7 @@ LowererImplImperative::splitAppenderAndInserters(const vector<Iterator>& results
 Stmt LowererImplImperative::lowerForall(Forall forall)
 {
   cout<<"Into lowerForall"<<endl;
+  if(!spTemporaryVars.empty() && inProducer) producerForallDepth ++;
   bool hasExactBound = provGraph.hasExactBound(forall.getIndexVar());
   bool forallNeedsUnderivedGuards = !hasExactBound && emitUnderivedGuards;
   if (!ignoreVectorize && forallNeedsUnderivedGuards &&
@@ -963,6 +974,9 @@ Stmt LowererImplImperative::lowerForall(Forall forall)
     parallelUnitIndexVars.erase(forall.getParallelUnit());
     parallelUnitSizes.erase(forall.getParallelUnit());
   }
+  if(!spTemporaryVars.empty() && inProducer) producerForallDepth --;
+
+
   return Block::blanks(preInitValues,
                        temporaryValuesInitFree[0],
                        loops,
@@ -1284,7 +1298,9 @@ Stmt LowererImplImperative::lowerForallDimension(Forall forall,
 
   body = Block::make({recoveryStmt, body});
 
+
   Stmt posAppend = generateAppendPositions(appenders);
+
 
   // Emit loop with preamble and postamble
   std::vector<ir::Expr> bounds = provGraph.deriveIterBounds(forall.getIndexVar(), definedIndexVarsOrdered, underivedBounds, indexVarToExprMap, iterators);
@@ -2208,6 +2224,9 @@ Stmt LowererImplImperative::lowerForallBody(Expr coordinate, IndexStmt stmt,
   Stmt incr = Block::make(stmts);
 
   // TODO: Emit code to insert coordinates
+  std::cout<<"Sparse Producer level: "<<producerForallDepth<<std::endl;
+  std::cout<<"declInserter: "<<declInserterPosVars<<std::endl;
+  std::cout<<"declLocator: "<<declLocatorPosVars<<std::endl;
 
   return Block::make(initVals,
                      declInserterPosVars,
@@ -2626,11 +2645,18 @@ vector<Stmt> LowererImplImperative::codeToInitializeSpTemporary(Where where){
 
   Stmt insertFailDecl = VarDecl::make(spInsertFail[temporary], ir::Literal::make(0));
   Stmt allocInsertFailDecl = Allocate::make(spInsertFail[temporary], ir::Literal::make(1));
-  Stmt initInsertFailDecl = Store::make(spInsertFail[temporary],ir::Literal::make(0),ir::Literal::make(false));
+  Stmt initInsertFailDecl = Store::make(spInsertFail[temporary], ir::Literal::make(0),ir::Literal::make(false));
 
   Stmt initSpWS = Stmt();
   if (temporary.getAccType() == SpFormat::Hash) {
     ir::Call::make("init_"+pointName, {accArr,ir::Literal::make(0),spAccCapacity[temporary]}, Bool);
+  }
+
+  Stmt SpPointDecl = VarDecl::make(spPoint[temporary], ir::Literal::make(0));
+  Stmt allocSpPoint = Allocate::make(spPoint[temporary], temporary.getOrder());
+  vector<Stmt> PointDecl;
+  for (int i = 0; i < temporary.getOrder(); i++) {
+    PointDecl.push_back(VarDecl::make(spDims[temporary][i], ir::Literal::make(0)));
   }
 
   vector<Stmt> Stmts = {accCapacityDecl,accSizeDecl,accArrDecl,allocAccArr,
@@ -2638,12 +2664,14 @@ vector<Stmt> LowererImplImperative::codeToInitializeSpTemporary(Where where){
   Stmts.insert(Stmts.end(), allCrdsDecl.begin(), allCrdsDecl.end());
   Stmts.insert(Stmts.end(), allocAllCrds.begin(), allocAllCrds.end());
   Stmts.insert(Stmts.end(), {allValDecl, allocAllVal, insertFailDecl, allocInsertFailDecl, initInsertFailDecl,
-                                     initSpWS});
+                                     initSpWS, SpPointDecl, allocSpPoint});
+  Stmts.insert(Stmts.end(), PointDecl.begin(), PointDecl.end());
 
   Stmt initializeSpTemporary = Block::make(Stmts);
 
   Stmts.clear();
-  Stmts = {Free::make(accArr), Free::make(spAllvals[temporary]), Free::make(spInsertFail[temporary])};
+  Stmts = {Free::make(accArr), Free::make(spAllvals[temporary]), Free::make(spInsertFail[temporary]),
+           Free::make(spPoint[temporary])};
   for(int i = 0; i < temporary.getOrder(); i++) {
     Stmts.push_back(Free::make(spAllcrd[temporary][i]));
   }
@@ -2675,6 +2703,7 @@ Stmt LowererImplImperative::lowerWhere(Where where) {
       temporaryValuesInitFree[0] = ir::Block::make(decls);
     }
   }
+  if (temporary.getAccType() != SpFormat::None) temporaryHoisted = false;
 
   if (!temporaryHoisted) {
     temporaryValuesInitFree = codeToInitializeTemporary(where);
@@ -2692,6 +2721,8 @@ Stmt LowererImplImperative::lowerWhere(Where where) {
   );
 
   Stmt consumer = lower(where.getConsumer());
+
+
   if (accelerateDenseWorkSpace && sortAccelerator) {
     // We need to sort the indices array
     Expr listOfIndices = tempToIndexList.at(temporary);
@@ -2703,7 +2734,8 @@ Stmt LowererImplImperative::lowerWhere(Where where) {
 
   // Now that temporary allocations are hoisted, we always need to emit an initialization loop before entering the
   // producer but only if there is no dense acceleration
-  if (util::contains(needCompute, temporary) && !isScalar(temporary.getType()) && !accelerateDenseWorkSpace) {
+  if (util::contains(needCompute, temporary) && !isScalar(temporary.getType()) && !accelerateDenseWorkSpace &&
+      temporary.getAccType() == SpFormat::None) {
     // TODO: We only actually need to do this if:
     //      1) We use the temporary multiple times
     //      2) The PRODUCER RHS is sparse(not full). (Guarantees that old values are overwritten before consuming)
@@ -2729,7 +2761,11 @@ Stmt LowererImplImperative::lowerWhere(Where where) {
     restoreAtomicDepth = true;
   }
 
+  inProducer = true;
+  SpPointDepth = 0;
   Stmt producer = lower(where.getProducer());
+  inProducer = false;
+
   if (accelerateDenseWorkSpace) {
     const Expr indexListSizeExpr = tempToIndexListSize.at(temporary);
     const Stmt indexListSizeDecl = VarDecl::make(indexListSizeExpr, ir::Literal::make(0));
@@ -3557,7 +3593,13 @@ Stmt LowererImplImperative::declLocatePosVars(vector<Iterator> locators) {
         Stmt declarePosVar = VarDecl::make(locateIterator.getPosVar(),
                                            locate.getResults()[0]);
         result.push_back(declarePosVar);
-
+        if (inProducer) {
+          for (auto &sp: spTemporaryVars) {
+            if (tensorVars[sp] == locator.getTensor()) {
+              result.push_back(Store::make(spPoint[sp], ir::Literal::make(SpPointDepth++), locateIterator.getPosVar()));
+            }
+          }
+        }
         if (locateIterator.isLeaf()) {
           break;
         }

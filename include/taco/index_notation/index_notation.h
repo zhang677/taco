@@ -1211,6 +1211,9 @@ public:
   /// Check whether the tensor variable is defined.
   bool defined() const;
 
+  /// Exchange format and spformat
+  void exchangeFormat();
+
   /// Create an index expression that accesses (reads) this tensor.
   const Access operator()(const std::vector<IndexVar>& indices) const;
 

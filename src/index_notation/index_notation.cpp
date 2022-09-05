@@ -2600,11 +2600,12 @@ TensorVar::TensorVar(const int &id, const std::string& name, const Type& type, c
   for (int i=0; i<format.getOrder(); i++){
     pack.push_back(Dense);
   }
-  content->format = format.getModeOrdering().empty() ? Format(pack) : Format(pack,format.getModeOrdering());
+  content->format = format;
   content->fill = fill.defined()? fill : Literal::zero(type.getDataType());
   content->accelIndexVars = std::vector<IndexVar> {};
   content->shouldAccel = true;
-  content->spformat = format;
+  content->spformat = SpFormat(format.getModeOrdering().empty() ? Format(pack) : Format(pack,format.getModeOrdering()),
+                               format.getAccType());
 }
 
 
@@ -2677,6 +2678,12 @@ void TensorVar::setName(std::string name) {
 
 bool TensorVar::defined() const {
   return content != nullptr;
+}
+
+void TensorVar::exchangeFormat() {
+  SpFormat temp = content->spformat;
+  content->spformat = SpFormat(content->format, temp.getAccType());
+  content->format = temp;
 }
 
 const Access TensorVar::operator()(const std::vector<IndexVar>& indices) const {

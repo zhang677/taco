@@ -460,7 +460,7 @@ SpFormat::SpFormat(const std::vector<ModeFormatPack> &modeFormatPacks, AccType a
 SpFormat::SpFormat(const std::vector<ModeFormatPack> &modeFormatPacks, const std::vector<int>& modeOrdering, AccType accType): Format(modeFormatPacks), acc(accType){
   ;
 }
-SpFormat::AccType SpFormat::getAccType() { return this->acc;}
+SpFormat::AccType SpFormat::getAccType() const { return this->acc;}
 
 
 
