@@ -294,6 +294,9 @@ void CodeGen_C::visit(const Function* func) {
   }
   if (IsFirst && outputKind == ImplementationGen && !(func->wsvars).empty()) {
     out << printWsFuncs(func->wsvars) << endl;
+    for(auto& var: func->wsvars) {
+      wsVarNames.insert(var.first);
+    }
     IsFirst = false;
   }
   int numYields = countYields(func);
@@ -503,7 +506,11 @@ void CodeGen_C::visit(const While* op) {
 }
 
 void CodeGen_C::visit(const GetProperty* op) {
-  taco_iassert(varMap.count(op) > 0) <<
+  std::stringstream tensorName;
+  tensorName << op->tensor;
+  std::string tensor;
+  tensorName >> tensor;
+  taco_iassert(varMap.count(op) > 0 || wsVarNames.count(tensor) != 0 ) <<
       "Property " << Expr(op) << " of " << op->tensor << " not found in varMap";
   out << varMap[op];
 }

@@ -44,6 +44,7 @@ protected:
   void visit(const Assign*);
 
   std::map<Expr, std::string, ExprCompare> varMap;
+  std::set<std::string> wsVarNames;
   std::vector<Expr> localVars;
   std::ostream &out;
   

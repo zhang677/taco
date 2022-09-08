@@ -59,7 +59,7 @@ protected:
   std::string genUniqueName(std::string name);
   void doIndentStream(std::stringstream &stream);
 
-  std::string printWsFuncs(std::map<std::string,std::pair<int,std::string>> wsvars);
+  std::string printWsFuncs(std::map<std::string,std::tuple<int,std::string>> wsvars);
 
   CodeGenType codeGenType;
 

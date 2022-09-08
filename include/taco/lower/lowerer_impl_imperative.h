@@ -545,6 +545,8 @@ private:
 
   /// Map from sparse workspace tensors to variables tracking size and capacity.
   /// Different from whereTotemp, where statement may be the outer-most stmt.
+  std::map<TensorVar, ir::Expr> spAccArr;
+  std::map<TensorVar, std::string> spPointName;
   std::map<TensorVar, ir::Expr> spAccSize;
   std::map<TensorVar, ir::Expr> spAccCapacity;
   std::map<TensorVar, std::vector<ir::Expr>> spAllcrd;

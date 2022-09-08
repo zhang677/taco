@@ -234,6 +234,12 @@ static std::set<Expr> hasSparseInserts(IndexStmt stmt, Iterators iterators,
 
 void LowererImplImperative::createSpAssistVars(const std::set<TensorVar>& tensorVars) {
   for (auto& tensor : tensorVars) {
+    const std::string accName = tensor.getName() + "_accumulator";
+    // Name of point struct depends on the codegen: item.first+"space"
+    const std::string pointSuffix = "space";
+    const std::string pointName = tensor.getName() + pointSuffix;
+    const Datatype pointType = UserDefined(pointName);
+    this->spAccArr.insert({tensor,ir::Var::make(accName, pointType, true, false)});
     this->spAccCapacity.insert({tensor, Var::make(tensor.getName() + "_accumulator_capacity", Int32)});
     this->spAccSize.insert({tensor, Var::make(tensor.getName() + "_accumulator_size", Int32)});
     this->spAllSize.insert({tensor, Var::make(tensor.getName() + "_all_size", Int32)});
@@ -300,6 +306,23 @@ LowererImplImperative::lower(IndexStmt stmt, string name,
   vector<Expr> resultsIR = createVars(results, &resultVars, unpack);
   tensorVars.insert(resultVars.begin(), resultVars.end());
   vector<Expr> argumentsIR = createVars(arguments, &tensorVars, pack);
+
+  // Add sparse workspace tensor variables
+  std::map<std::string,std::tuple<int,std::string>> wsvars;
+  for (auto& var: spTemporaryVars) {
+    std::string name = var.getName();
+    int mode = var.getOrder();
+    std::stringstream type;
+    type << var.getType().getDataType();
+    std::string dType;
+    type >> dType;
+    wsvars.insert({name, {mode, dType}});
+  }
+
+  // Assemble the sparse workspace: return 0;
+  if(!wsvars.empty() && this->assemble) {
+    return Function::make(name, resultsIR, argumentsIR, Block::blanks(Stmt()),wsvars);
+  }
 
   // Create variables for index sets on result tensors.
   vector<Expr> indexSetArgs;
@@ -486,25 +509,6 @@ LowererImplImperative::lower(IndexStmt stmt, string name,
     }
   }
 
-  // Add sparse workspace tensor variables
-  vector<Access> tempAccesses = getTemporaryAccesses(stmt);
-  std::map<std::string,std::pair<int,std::string>> wsvars;
-  for (auto& resAccess: tempAccesses) {
-    std::string name = resAccess.getTensorVar().getName();
-    int mode = resAccess.getTensorVar().getType().getShape().getOrder();
-    std::stringstream type;
-    type << resAccess.getTensorVar().getType().getDataType();
-    std::string dType;
-    type >> dType;
-    if (mode > 1 && resAccess.getTensorVar().getAccType()!=SpFormat::None) {
-      wsvars.insert({name, {mode, dType}});
-    }
-  }
-
-  if(!wsvars.empty() && this->assemble) {
-    return Function::make(name, resultsIR, argumentsIR, Block::blanks(Stmt()),wsvars);
-  }
-
   // Create function
   return Function::make(name, resultsIR, argumentsIR,
                           Block::blanks(Block::make(header),
@@ -642,9 +646,41 @@ Stmt LowererImplImperative::lowerAssignment(Assignment assignment)
   //       we'll know exactly how much we need.
   bool temporaryWithSparseAcceleration = util::contains(tempToIndexList, result);
   if (generateComputeCode() && !temporaryWithSparseAcceleration) {
-    taco_iassert(computeStmt.defined());
-    return assembleGuardTrivial ? computeStmt : IfThenElse::make(assembleGuard,
-                                                                 computeStmt);
+    // taco_iassert(computeStmt.defined());
+    // return assembleGuardTrivial ? computeStmt : IfThenElse::make(assembleGuard,
+    //                                                             computeStmt);
+    if (computeStmt.defined()) {
+      return assembleGuardTrivial ? computeStmt : IfThenElse::make(assembleGuard,computeStmt);
+    }
+    else {
+      if (result.getAccType() == SpFormat::Coord) {
+        Stmt TryInsert = ir::Assign::make(spAccSize[result],ir::Call::make
+        ("TryInsert_coord", {spInsertFail[result], spAccArr[result],spAccSize[result],spAccCapacity[result]
+        , spPoint[result], lower(assignment.getRhs())},Int32));
+        vector<Stmt> EnlargerInner;
+        EnlargerInner.push_back(ir::Assign::make(spAllCapacity[result],
+                                                 ir::Mul::make(spAllCapacity[result],ir::Literal::make(2))));
+        for (int i = 0; i < result.getOrder(); i++) {
+          EnlargerInner.push_back(ir::Allocate::make(spAllcrd[result][i],spAllCapacity[result],true,
+                                                     spAllcrd[result][i]));
+        }
+        EnlargerInner.push_back(ir::Allocate::make(spAllvals[result],spAccCapacity[result],true,spAllvals[result]));
+        Stmt Enlarger = ir::IfThenElse::make(Load::make(spInsertFail[result],ir::Literal::make(0)),
+                                             Block::make(
+         ir::IfThenElse::make(ir::Gt::make(ir::Add::make(spAccSize[result],spAccSize[result]),spAllCapacity[result]),
+            ir::Block::make(EnlargerInner))));
+        std::vector<Expr> MergeParameters;
+        for(int i = 0; i < result.getOrder(); i++) {
+          MergeParameters.push_back(spAllcrd[result][i]);
+        }
+        MergeParameters.insert(MergeParameters.end(), {spAllvals[result], spAllSize[result], spAccArr[result],
+                                                       spAccSize[result]});
+        Stmt Merger = ir::Assign::make(spAllSize[result], ir::Call::make("Merge_coord", MergeParameters, Int32));
+        Stmt Clear = ir::Assign::make(spAccSize[result], ir::Literal::make(0));
+        computeStmt = Block::make(TryInsert, Enlarger, Merger, Clear, TryInsert);
+        return computeStmt;
+      }
+    }
   }
   cout<<"computeStmt4: "<<computeStmt<<endl;
   if (temporaryWithSparseAcceleration) {
@@ -2619,18 +2655,12 @@ vector<Stmt> LowererImplImperative::codeToInitializeSpTemporary(Where where){
 
   Stmt freeTemporary = Stmt();
   Stmt initializeTemporary = Stmt();
-  const std::string accName = temporary.getName() + "_accumulator";
 
-  // Name of point struct depends on the codegen: item.first+"space"
-  const std::string pointSuffix = "space";
-  const std::string pointName = temporary.getName() + pointSuffix;
-  const Datatype pointType = UserDefined(pointName);
-  const Expr accArr = ir::Var::make(accName, pointType, true, false);
 
   Stmt accCapacityDecl = VarDecl::make(spAccCapacity[temporary], ir::Literal::make(1<<20));
   Stmt accSizeDecl = VarDecl::make(spAccSize[temporary], ir::Literal::make(0));
-  Stmt accArrDecl = VarDecl::make(accArr, ir::Literal::make(0));
-  Stmt allocAccArr = Allocate::make(accArr, spAccCapacity[temporary]);
+  Stmt accArrDecl = VarDecl::make(spAccArr[temporary], ir::Literal::make(0));
+  Stmt allocAccArr = Allocate::make(spAccArr[temporary], spAccCapacity[temporary]);
 
   Stmt allCapacityDecl = VarDecl::make(spAllCapacity[temporary], spAccCapacity[temporary]);
   Stmt allSizeDecl = VarDecl::make(spAllSize[temporary], ir::Literal::make(0));
@@ -2649,13 +2679,15 @@ vector<Stmt> LowererImplImperative::codeToInitializeSpTemporary(Where where){
 
   Stmt initSpWS = Stmt();
   if (temporary.getAccType() == SpFormat::Hash) {
-    ir::Call::make("init_"+pointName, {accArr,ir::Literal::make(0),spAccCapacity[temporary]}, Bool);
+    ir::Call::make("init_"+spPointName[temporary], {spAccArr[temporary],ir::Literal::make(0),spAccCapacity[temporary]},
+                   Bool);
   }
 
   Stmt SpPointDecl = VarDecl::make(spPoint[temporary], ir::Literal::make(0));
   Stmt allocSpPoint = Allocate::make(spPoint[temporary], temporary.getOrder());
   vector<Stmt> PointDecl;
   for (int i = 0; i < temporary.getOrder(); i++) {
+    // GetProperty::make(temporary, TensorProperty::Dimension, i)
     PointDecl.push_back(VarDecl::make(spDims[temporary][i], ir::Literal::make(0)));
   }
 
@@ -2670,7 +2702,7 @@ vector<Stmt> LowererImplImperative::codeToInitializeSpTemporary(Where where){
   Stmt initializeSpTemporary = Block::make(Stmts);
 
   Stmts.clear();
-  Stmts = {Free::make(accArr), Free::make(spAllvals[temporary]), Free::make(spInsertFail[temporary]),
+  Stmts = {Free::make(spAccArr[temporary]), Free::make(spAllvals[temporary]), Free::make(spInsertFail[temporary]),
            Free::make(spPoint[temporary])};
   for(int i = 0; i < temporary.getOrder(); i++) {
     Stmts.push_back(Free::make(spAllcrd[temporary][i]));

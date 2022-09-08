@@ -655,13 +655,14 @@ void CodeGen::printYield(const Yield* op, vector<Expr> localVars,
   stream << labelPrefix << funcName << (labelCount++) << ":;" << endl;
 }
 
-std::string CodeGen::printWsFuncs(std::map<std::string, std::pair<int, std::string>> wsvars) {
+std::string CodeGen::printWsFuncs(std::map<std::string, std::tuple<int, std::string>> wsvars) {
   stringstream ret;
   for (auto& item: wsvars) {
     string clsname = item.first+"space";
     string cmpname = item.first+"_cmp";
-    int order = item.second.first;
-    string type = item.second.second;
+    string rev_cmpname = cmpname + "_rev";
+    int order = get<0>(item.second);
+    string type = get<1>(item.second);
     string crdVariables = "";
     for(int i=0; i<order; i++) {
       crdVariables += ("int32_t* COO"+ to_string(i+1)+"_crd, ");
@@ -670,6 +671,7 @@ std::string CodeGen::printWsFuncs(std::map<std::string, std::pair<int, std::stri
     ret << "  int32_t crd[" << order << "];" <<endl;
     ret << " " << type << " val;" <<endl;
     ret << "}"<<clsname <<" ;\n";
+
     ret << "int " << cmpname <<"(const void *b, const void *a) {" <<endl;
     ret << "  for (int i = 0; i < " << order << "; i++) {"<<endl;
     ret << "    if ((("<<clsname<<"*)b)->crd[i] == (("<<clsname<<"*)a)->crd[i]) continue;" <<endl;
@@ -677,6 +679,15 @@ std::string CodeGen::printWsFuncs(std::map<std::string, std::pair<int, std::stri
     ret << "  }" <<endl;
     ret << "return ((("<<clsname<<"*)b)->crd["<<order-1<<"] - (("<<clsname<<"*)a)->crd["<<order-1<<"]);"<<endl;
     ret << "}" <<endl;
+
+    ret << "int " << rev_cmpname << "(const void *a, const void *b) {" <<endl;
+    ret << "  for (int i = 0; i < " << order << "; i++) {"<<endl;
+    ret << "    if ((("<<clsname<<"*)b)->crd[i] == (("<<clsname<<"*)a)->crd[i]) continue;" <<endl;
+    ret << "    return ((("<<clsname<<"*)b)->crd[i] - (("<<clsname<<"*)a)->crd[i]);" <<endl;
+    ret << "  }" <<endl;
+    ret << "return ((("<<clsname<<"*)b)->crd["<<order-1<<"] - (("<<clsname<<"*)a)->crd["<<order-1<<"]);"<<endl;
+    ret << "}" <<endl;
+
     ret << "int Merge_coord("<< crdVariables <<type<<"* COO_vals, int32_t COO_size, "<<clsname<<"* accumulator, int32_t accumulator_size) {\n";
     ret << "    if (COO_size == 0) {\n";
     ret << "      for (int i=0; i<accumulator_size; i++) {\n";
@@ -753,6 +764,34 @@ std::string CodeGen::printWsFuncs(std::map<std::string, std::pair<int, std::stri
     ret << "    free(tmp_COO_vals);\n";
     ret << "    return target_pointer;\n";
     ret << "  }\n";
+
+    ret << "int Sort(void* array, size_t size, bool rev) {\n";
+    ret <<       "  if (rev) {\n";
+    ret <<       "    qsort(array, size, sizeof("<<clsname<<"), "<<rev_cmpname<<");\n";
+    ret <<       "    for (int i = size - 1; i >= 0; i--) {\n";
+    ret <<       "      if((("<<clsname<<"*)array)[i].crd[0] != -1) {\n";
+    ret <<       "        return i + 1;\n";
+    ret <<       "      }\n";
+    ret <<       "    }\n";
+    ret <<       "  } \n";
+    ret <<       "  qsort(array, size, sizeof("<<clsname<<"), "<<cmpname<<");\n";
+    ret <<       "  return size;\n";
+    ret <<       "}\n";
+
+    ret << "int32_t TryInsert_coord(bool* insertFail, "<<clsname<<"* accumulator, int32_t accumulator_size, int32_t accumulator_capacity, int32_t* crds, "<<type<<" val) {\n";
+    ret <<  "  if (accumulator_size == accumulator_capacity) {\n";
+     ret << "    *insertFail = true;\n";
+     ret << "    return Sort(accumulator, accumulator_capacity, false);\n";
+     ret << "  } else {\n";
+     for(int i = 0; i < order; i++) {
+       ret << "    accumulator[accumulator_size].crd["<<i<<"] = crds["<<i<<"];\n";
+     }
+     ret << "    accumulator[accumulator_size].val = val;\n";
+     ret << "    *insertFail = false;\n";
+     ret << "    accumulator_size ++;\n";
+     ret << "    return accumulator_size;\n";
+     ret << "  }\n";
+     ret << "}\n";
   }
   return ret.str();
 }

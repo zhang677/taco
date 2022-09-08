@@ -665,12 +665,12 @@ struct Function : public StmtNode<Function> {
   Stmt body;
   std::vector<Expr> inputs;
   std::vector<Expr> outputs;
-  std::map<std::string, std::pair<int,std::string>> wsvars;
+  std::map<std::string, std::tuple<int,std::string>> wsvars;
   
   static Stmt make(std::string name,
                    std::vector<Expr> outputs, std::vector<Expr> inputs,
                    Stmt body,
-                   std::map<std::string,std::pair<int,std::string>> wsvars = std::map<std::string,std::pair<int,std::string> >());
+                   std::map<std::string,std::tuple<int,std::string>> wsvars = std::map<std::string,std::tuple<int,std::string> >());
   
   std::pair<std::vector<Datatype>,Datatype> getReturnType() const;
   

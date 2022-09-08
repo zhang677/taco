@@ -699,7 +699,7 @@ Stmt While::make(Expr cond, Stmt contents, LoopKind kind,
 Stmt Function::make(std::string name,
                     std::vector<Expr> outputs, std::vector<Expr> inputs,
                     Stmt body,
-                    std::map<std::string,std::pair<int,std::string>> wsvars) {
+                    std::map<std::string,std::tuple<int,std::string>> wsvars) {
   Function *func = new Function;
   func->name = name;
   func->body = Scope::make(body);
