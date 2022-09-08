@@ -574,6 +574,7 @@ private:
 
   /// Tensor and mode iterators to iterate over in the lowered code
   Iterators iterators;
+  IndexStmt originalStmt;
 
   /// Keep track of relations between IndexVars
   ProvenanceGraph provGraph;

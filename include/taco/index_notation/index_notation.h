@@ -337,6 +337,9 @@ public:
   // comparison of the access rather than a pointer check.
   friend bool operator==(const Access& a, const Access& b);
   friend bool operator<(const Access& a, const Access &b);
+
+  /// Exchange the format of TensorVar
+  void exchangeFormat();
 };
 
 

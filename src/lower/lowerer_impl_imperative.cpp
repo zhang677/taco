@@ -244,6 +244,7 @@ void LowererImplImperative::createSpAssistVars(const std::set<TensorVar>& tensor
     this->spAccSize.insert({tensor, Var::make(tensor.getName() + "_accumulator_size", Int32)});
     this->spAllSize.insert({tensor, Var::make(tensor.getName() + "_all_size", Int32)});
     this->spAllCapacity.insert({tensor, Var::make(tensor.getName() + "_all_capacity", Int32)});
+    this->capacityVars.insert({this->tensorVars[tensor], this->spAllCapacity[tensor]});
     std::vector<Expr> Allcrd;
     for(int i = 0; i < tensor.getOrder(); i++) {
       Allcrd.push_back(Var::make(tensor.getName()+ to_string(i+1) + "_crd", Int32, true, false));
@@ -278,6 +279,7 @@ LowererImplImperative::lower(IndexStmt stmt, string name,
   definedIndexVarsOrdered = {};
   definedIndexVars = {};
   loopOrderAllowsShortCircuit = allForFreeLoopsBeforeAllReductionLoops(stmt);
+  originalStmt = stmt;
 
   // Create result and parameter variables
   vector<TensorVar> results = getResults(stmt);
@@ -646,6 +648,7 @@ Stmt LowererImplImperative::lowerAssignment(Assignment assignment)
   //       we'll know exactly how much we need.
   bool temporaryWithSparseAcceleration = util::contains(tempToIndexList, result);
   if (generateComputeCode() && !temporaryWithSparseAcceleration) {
+    // GEGHAN: Originally, computeStmt will not be defined. But I still don't figure out why.
     // taco_iassert(computeStmt.defined());
     // return assembleGuardTrivial ? computeStmt : IfThenElse::make(assembleGuard,
     //                                                             computeStmt);
@@ -2751,8 +2754,86 @@ Stmt LowererImplImperative::lowerWhere(Where where) {
             }
         })
   );
+  Stmt consumer = Stmt();
+  if(this->compute && !spTemporaryVars.empty()) {
+    this->assemble = true;
+    this->compute = true;
 
-  Stmt consumer = lower(where.getConsumer());
+    IndexStmt stmt = where.getConsumer();
+    struct FormatVisitor: public IndexNotationVisitor {
+      using IndexNotationVisitor::visit;
+      std::set<TensorVar> spTemporaryVars;
+      IndexExpr& newExpr;
+      TensorVar& tensor;
+      FormatVisitor(std::set<TensorVar> spVars, IndexExpr& newExpr, TensorVar& tensor):
+      spTemporaryVars(spVars.begin(),spVars.end()),newExpr(newExpr),tensor(tensor) {}
+      void visit(const AccessNode* node) {
+        tensor = node->tensorVar;
+        if(spTemporaryVars.count(tensor)>0) {
+          tensor.exchangeFormat();
+          newExpr = Access(tensor, node->indexVars, node->packageModifiers(),node->isAccessingStructure);
+        }
+      }
+    };
+
+    struct FormatRewriter: public IndexNotationRewriter {
+      using IndexNotationRewriter::visit;
+      IndexExpr newExpr;
+      FormatRewriter(IndexExpr& newExpr):newExpr(newExpr) {}
+      void visit(const AssignmentNode* node) {
+        Assignment a(node->lhs, node->rhs, node->op);
+        stmt = Assignment(a.getLhs(), newExpr, a.getOperator());
+        IndexNotationRewriter::visit(node);
+      }
+    };
+    struct CheckVisitor: public IndexNotationVisitor {
+      using IndexNotationVisitor::visit;
+      std::set<TensorVar> spTemporaryVars;
+      CheckVisitor(std::set<TensorVar> spVars):spTemporaryVars(spVars.begin(),spVars.end()) {}
+      void visit(const AccessNode* node) {
+        TensorVar tensor = node->tensorVar;
+        if(spTemporaryVars.count(tensor)>0) {
+          cout<<"Current Format: ";
+          cout<<tensor.getFormat()<<endl;
+        }
+      }
+    };
+    IndexExpr newExpr;
+    TensorVar tensor;
+    FormatVisitor FmtVisitor(this->spTemporaryVars, newExpr, tensor);
+    FormatRewriter FmtRewriter(newExpr);
+    CheckVisitor ChkVisitor(this->spTemporaryVars);
+    FmtVisitor.visit(stmt);
+    FmtRewriter.rewrite(stmt);
+    ChkVisitor.visit(stmt);
+    // Change the iterators
+    std::pair<TensorVar, ir::Expr> original;
+
+    for (auto& tensorVar : tensorVars) {
+      if(tensor.getName()==tensorVar.first.getName()) {
+        original = tensorVar;
+      }
+    }
+    tensorVars.erase(original.first);
+    TensorVar exchangedTensor = tensor;
+    tensorVars.insert({exchangedTensor,original.second});
+    iterators = Iterators(originalStmt, tensorVars);
+    // End Changing
+    consumer = lower(stmt);
+
+    FmtVisitor.visit(stmt);
+    FmtRewriter.rewrite(stmt);
+    ChkVisitor.visit(where.getConsumer());
+    // Change the iterators back
+    tensorVars.erase(exchangedTensor);
+    tensorVars.insert(original);
+    iterators = Iterators(originalStmt, tensorVars);
+    // End Changing
+    this->compute = true;
+    this->assemble = false;
+  } else {
+    consumer = lower(where.getConsumer());
+  }
 
 
   if (accelerateDenseWorkSpace && sortAccelerator) {
@@ -3325,7 +3406,6 @@ Stmt LowererImplImperative::initResultArrays(vector<Access> writes,
       // Pre-allocate memory for the value array if computing while assembling
       if (generateComputeCode()) {
         taco_iassert(!iterators.empty());
-
         Expr capacityVar = getCapacityVar(tensor);
         Expr allocSize = isValue(parentSize, 0)
                          ? DEFAULT_ALLOC_SIZE : parentSize;
@@ -3549,6 +3629,7 @@ Stmt LowererImplImperative::resizeAndInitValues(const std::vector<Iterator>& app
 
     Expr tensor = appender.getTensor();
     Expr values = GetProperty::make(tensor, TensorProperty::Values);
+    cout<<"3586:"<<endl;
     Expr capacity = getCapacityVar(appender.getTensor());
     Expr pos = appender.getIteratorVar();
 

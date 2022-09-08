@@ -1100,6 +1100,7 @@ bool operator==(const Access& a, const Access& b) {
   return true;
 }
 
+
 bool operator<(const Access& a, const Access& b) {
   // First branch on tensorVar.
   if (a.getTensorVar() != b.getTensorVar()) {
@@ -2600,12 +2601,11 @@ TensorVar::TensorVar(const int &id, const std::string& name, const Type& type, c
   for (int i=0; i<format.getOrder(); i++){
     pack.push_back(Dense);
   }
-  content->format = format;
+  content->format = format.getModeOrdering().empty() ? Format(pack) : Format(pack,format.getModeOrdering());
   content->fill = fill.defined()? fill : Literal::zero(type.getDataType());
   content->accelIndexVars = std::vector<IndexVar> {};
   content->shouldAccel = true;
-  content->spformat = SpFormat(format.getModeOrdering().empty() ? Format(pack) : Format(pack,format.getModeOrdering()),
-                               format.getAccType());
+  content->spformat = format;
 }
 
 

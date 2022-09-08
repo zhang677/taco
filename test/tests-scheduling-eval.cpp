@@ -665,8 +665,8 @@ TEST(scheduling_eval, spWS) {
   Format cFormat = CSR;
   //Format cFormat = COO(2,true,true,false,{0,1});
   //Format wFormat = COO(2,true,true,false,{0,1});//{Dense, Dense};//COO(2,true,true,false,{0,1});// COO(2,false,false,false,{0,1});
-  //SpFormat wFormat = SpFormat(COO(2,true,true,false,{0,1}), SpFormat::Coord);
-  SpFormat wFormat = SpFormat(Format({Dense,Dense}), SpFormat::Coord);
+  SpFormat wFormat = SpFormat(COO(2,true,true,false,{0,1}), SpFormat::Coord);
+  //SpFormat wFormat = SpFormat(Format({Dense,Dense}), SpFormat::Coord);
   //Format wFormat = {Dense, Dense};
   Tensor<float> A("A",{NUM_I, NUM_J},aFormat);
   Tensor<float> B("B",{NUM_J, NUM_K},bFormat);
