@@ -550,12 +550,12 @@ private:
   std::map<TensorVar, ir::Expr> spAccSize;
   std::map<TensorVar, ir::Expr> spAccCapacity;
   std::map<TensorVar, std::vector<ir::Expr>> spAllcrd;
+  std::map<TensorVar, std::vector<ir::Expr>> spAllPos;
   std::map<TensorVar, ir::Expr> spAllvals;
   std::map<TensorVar, ir::Expr> spAllSize;
   std::map<TensorVar, ir::Expr> spAllCapacity;
   std::map<TensorVar, ir::Expr> spInsertFail;
   std::map<TensorVar, ir::Expr> spPoint;
-  std::map<TensorVar, std::vector<ir::Expr>> spDims; // To adjust to the current declLocatePosVars
   void createSpAssistVars(const std::set<TensorVar>&);
 
   /// Forall loop depth of producer side
@@ -621,7 +621,7 @@ private:
   std::set<TensorVar> spTemporaryVars;
 
   /// Set the sparse workspace flags
-  void setSpWorkspace(const std::vector<TensorVar>& temporary);
+  std::vector<TensorVar> getSpWorkspace(const std::vector<TensorVar>& temporary);
 
   /// Initialize a sparse workspace
   std::vector<ir::Stmt> codeToInitializeSpTemporary(Where where);

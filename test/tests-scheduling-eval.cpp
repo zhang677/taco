@@ -796,7 +796,7 @@ TEST_P(spgemm, scheduling_eval) {
 }
 
 INSTANTIATE_TEST_CASE_P(spgemm, spgemm,
-                        Values(std::make_tuple(CSR, CSC, true)));//,
+                        Values(std::make_tuple(CSR, CSR, true)));//,
                                //std::make_tuple(DCSR, CSR, true),
                                //std::make_tuple(DCSR, DCSR, true),
                                //std::make_tuple(CSR, CSC, false),

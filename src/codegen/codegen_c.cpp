@@ -510,9 +510,27 @@ void CodeGen_C::visit(const GetProperty* op) {
   tensorName << op->tensor;
   std::string tensor;
   tensorName >> tensor;
-  taco_iassert(varMap.count(op) > 0 || wsVarNames.count(tensor) != 0 ) <<
-      "Property " << Expr(op) << " of " << op->tensor << " not found in varMap";
-  out << varMap[op];
+  if (wsVarNames.count(tensor) == 0) {
+    taco_iassert(varMap.count(Expr(op)) > 0) <<
+                                             "Property " << Expr(op) << " of " << op->tensor << " not found in varMap";
+    out << varMap[op];
+  }
+  else {
+    Expr temp;
+    std::stringstream tempStream;
+    tempStream << Expr(op);
+    std::string tempName;
+    tempStream >> tempName;
+    for (auto& var : varMap) {
+      if(var.second == tempName) {
+        temp = var.first;
+        break;
+      }
+    }
+    taco_iassert(varMap.count(temp) > 0) <<
+                      "Property " << temp << " of " << op->tensor << " is found in varMap" <<endl;
+    out << varMap[temp];
+  }
 }
 
 void CodeGen_C::visit(const Min* op) {

@@ -239,7 +239,7 @@ void LowererImplImperative::createSpAssistVars(const std::set<TensorVar>& tensor
     const std::string pointSuffix = "space";
     const std::string pointName = tensor.getName() + pointSuffix;
     const Datatype pointType = UserDefined(pointName);
-    this->spAccArr.insert({tensor,ir::Var::make(accName, pointType, true, false)});
+    this->spAccArr.insert({tensor, Var::make(accName, pointType, true, false)});
     this->spAccCapacity.insert({tensor, Var::make(tensor.getName() + "_accumulator_capacity", Int32)});
     this->spAccSize.insert({tensor, Var::make(tensor.getName() + "_accumulator_size", Int32)});
     this->spAllSize.insert({tensor, Var::make(tensor.getName() + "_all_size", Int32)});
@@ -249,25 +249,32 @@ void LowererImplImperative::createSpAssistVars(const std::set<TensorVar>& tensor
     for(int i = 0; i < tensor.getOrder(); i++) {
       Allcrd.push_back(Var::make(tensor.getName()+ to_string(i+1) + "_crd", Int32, true, false));
     }
+    std::vector<Expr> AllPos;
+    for(int i = 0; i < tensor.getOrder(); i++) {
+      AllPos.push_back(Var::make(tensor.getName()+ to_string(i+1) + "_pos", Int32, true, false));
+    }
     this->spAllcrd.insert({tensor, Allcrd});
-    this->spAllvals.insert({tensor, Var::make(tensor.getName() + "_val", tensor.getType().getDataType(), true, false)});
+    this->spAllPos.insert({tensor, AllPos});
+    this->spAllvals.insert({tensor, Var::make(tensor.getName() + "_vals", tensor.getType().getDataType(), true, false)});
     this->spInsertFail.insert({tensor, Var::make(tensor.getName() + "_insertFail", Bool, true, false)});
     this->spPoint.insert({tensor, Var::make(tensor.getName() + "_point", Int32, true, false)});
     Allcrd.clear();
     for(int i = 0; i < tensor.getOrder(); i++) {
       Allcrd.push_back(Var::make(tensor.getName() + to_string(i+1) + "_dimension", Int32));
     }
-    this->spDims.insert({tensor, Allcrd});
   }
 }
 
 /// Set the sparse workspace flags
-void LowererImplImperative::setSpWorkspace(const std::vector<TensorVar>& temporary){
+vector<TensorVar> LowererImplImperative::getSpWorkspace(const std::vector<TensorVar>& temporary){
+  vector<TensorVar> ret;
   for (auto& temp: temporary) {
     if(temp.getAccType()!=SpFormat::None) {
       this->spTemporaryVars.insert(temp);
+      ret.push_back(temp);
     }
   }
+  return ret;
 }
 
 Stmt
@@ -285,7 +292,7 @@ LowererImplImperative::lower(IndexStmt stmt, string name,
   vector<TensorVar> results = getResults(stmt);
   vector<TensorVar> arguments = getArguments(stmt);
   vector<TensorVar> temporaries = getTemporaries(stmt);
-  setSpWorkspace(temporaries);
+  vector<TensorVar> sparseTemporaries = getSpWorkspace(temporaries);
 
   needCompute = {};
   if (generateAssembleCode()) {
@@ -308,6 +315,7 @@ LowererImplImperative::lower(IndexStmt stmt, string name,
   vector<Expr> resultsIR = createVars(results, &resultVars, unpack);
   tensorVars.insert(resultVars.begin(), resultVars.end());
   vector<Expr> argumentsIR = createVars(arguments, &tensorVars, pack);
+
 
   // Add sparse workspace tensor variables
   std::map<std::string,std::tuple<int,std::string>> wsvars;
@@ -352,6 +360,14 @@ LowererImplImperative::lower(IndexStmt stmt, string name,
                                    true, true);
     tensorVars.insert({temp, irVar});
   }
+  vector<Expr> spTempIR = createVars(sparseTemporaries, &tensorVars);
+  argumentsIR.insert(argumentsIR.end(), spTempIR.begin(), spTempIR.end());
+
+  cout<<"argumentsIR: "<<endl;
+  for(auto& r: argumentsIR) {
+    cout<<r<<",";
+  }
+  cout<<endl;
 
   // Create variables for keeping track of result values array capacity
   createCapacityVars(resultVars, &capacityVars);
@@ -2675,6 +2691,16 @@ vector<Stmt> LowererImplImperative::codeToInitializeSpTemporary(Where where){
   }
   Stmt allValDecl = VarDecl::make(spAllvals[temporary], ir::Literal::make(0));
   Stmt allocAllVal = Allocate::make(spAllvals[temporary], spAllCapacity[temporary]);
+  vector<Stmt> allPosDecl; // TODO: Add position array decl and alloc
+  vector<Stmt> allocAllPos;
+  for (int i = 0; i < temporary.getOrder(); i++) {
+    allPosDecl.push_back(VarDecl::make(spAllPos[temporary][i], ir::Literal::make(0)));
+    if (i == 0) {
+      allocAllPos.push_back(Allocate::make(spAllPos[temporary][i], ir::Literal::make(2)));
+    } else {
+      allocAllPos.push_back(Allocate::make(spAllPos[temporary][i], spAllCapacity[temporary]));
+    }
+  }
 
   Stmt insertFailDecl = VarDecl::make(spInsertFail[temporary], ir::Literal::make(0));
   Stmt allocInsertFailDecl = Allocate::make(spInsertFail[temporary], ir::Literal::make(1));
@@ -2688,19 +2714,15 @@ vector<Stmt> LowererImplImperative::codeToInitializeSpTemporary(Where where){
 
   Stmt SpPointDecl = VarDecl::make(spPoint[temporary], ir::Literal::make(0));
   Stmt allocSpPoint = Allocate::make(spPoint[temporary], temporary.getOrder());
-  vector<Stmt> PointDecl;
-  for (int i = 0; i < temporary.getOrder(); i++) {
-    // GetProperty::make(temporary, TensorProperty::Dimension, i)
-    PointDecl.push_back(VarDecl::make(spDims[temporary][i], ir::Literal::make(0)));
-  }
 
   vector<Stmt> Stmts = {accCapacityDecl,accSizeDecl,accArrDecl,allocAccArr,
                            allCapacityDecl,allSizeDecl};
   Stmts.insert(Stmts.end(), allCrdsDecl.begin(), allCrdsDecl.end());
   Stmts.insert(Stmts.end(), allocAllCrds.begin(), allocAllCrds.end());
+  Stmts.insert(Stmts.end(), allPosDecl.begin(), allPosDecl.end());
+  Stmts.insert(Stmts.end(), allocAllPos.begin(), allocAllPos.end());
   Stmts.insert(Stmts.end(), {allValDecl, allocAllVal, insertFailDecl, allocInsertFailDecl, initInsertFailDecl,
                                      initSpWS, SpPointDecl, allocSpPoint});
-  Stmts.insert(Stmts.end(), PointDecl.begin(), PointDecl.end());
 
   Stmt initializeSpTemporary = Block::make(Stmts);
 
@@ -2709,6 +2731,9 @@ vector<Stmt> LowererImplImperative::codeToInitializeSpTemporary(Where where){
            Free::make(spPoint[temporary])};
   for(int i = 0; i < temporary.getOrder(); i++) {
     Stmts.push_back(Free::make(spAllcrd[temporary][i]));
+  }
+  for(int i = 0; i < temporary.getOrder(); i++) {
+    Stmts.push_back(Free::make(spAllPos[temporary][i]));
   }
 
   Stmt freeSpTemporary = Block::make(Stmts);
@@ -3705,11 +3730,13 @@ Stmt LowererImplImperative::declLocatePosVars(vector<Iterator> locators) {
         taco_iassert(isValue(locate.getResults()[1], true));
         Stmt declarePosVar = VarDecl::make(locateIterator.getPosVar(),
                                            locate.getResults()[0]);
+
         result.push_back(declarePosVar);
         if (inProducer) {
           for (auto &sp: spTemporaryVars) {
             if (tensorVars[sp] == locator.getTensor()) {
-              result.push_back(Store::make(spPoint[sp], ir::Literal::make(SpPointDepth++), locateIterator.getPosVar()));
+              result.pop_back();
+              result.push_back(Store::make(spPoint[sp], ir::Literal::make(SpPointDepth++), coords.back()));
             }
           }
         }
