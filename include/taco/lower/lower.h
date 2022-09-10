@@ -4,6 +4,8 @@
 #include <string>
 #include <set>
 #include <memory>
+#include <map>
+#include "../index_notation/index_notation.h"
 
 namespace taco {
 
@@ -45,6 +47,10 @@ private:
 /// also provide a custom `Lowerer` to specify custom ways to lower some or all
 /// parts of a concrete index notation statement.
 ir::Stmt lower(IndexStmt stmt, std::string functionName,
+               bool assemble=true, bool compute=true, bool pack=false, bool unpack=false,
+               Lowerer lowerer=Lowerer());
+
+ir::Stmt lower(IndexStmt stmt, std::map<TensorVar,IndexStmt> helperStmts,std::string functionName,
                bool assemble=true, bool compute=true, bool pack=false, bool unpack=false,
                Lowerer lowerer=Lowerer());
 

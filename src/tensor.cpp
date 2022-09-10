@@ -673,6 +673,39 @@ void TensorBase::compile(taco::IndexStmt stmt, bool assembleWhileCompute) {
   cacheComputeKernel(concretizedAssign, content->module);
 }
 
+void TensorBase::compile(taco::IndexStmt stmt, std::map<taco::TensorVar, taco::IndexStmt> helperStmts,bool assembleWhileCompute) {
+  if (!needsCompile()) {
+    return;
+  }
+  setNeedsCompile(false);
+
+  IndexStmt concretizedAssign = stmt;
+  IndexStmt stmtToCompile = stmt.concretize();
+  stmtToCompile = scalarPromote(stmtToCompile);
+
+  if (!std::getenv("CACHE_KERNELS") ||
+      std::string(std::getenv("CACHE_KERNELS")) != "0") {
+    concretizedAssign = stmtToCompile;
+    const auto cachedKernel = getComputeKernel(concretizedAssign);
+    if (cachedKernel) {
+      content->module = cachedKernel;
+      return;
+    }
+  }
+
+  content->assembleFunc = lower(stmtToCompile, "assemble", true, false);
+  content->computeFunc = lower(stmtToCompile, helperStmts, "compute",  assembleWhileCompute, true);
+  // If we have to recompile the kernel, we need to create a new Module. Since
+  // the module we are holding on to could have been retrieved from the cache,
+  // we can't modify it.
+  content->module = make_shared<Module>();
+  content->module->addFunction(content->assembleFunc);
+  content->module->addFunction(content->computeFunc);
+  content->module->compile();
+  cacheComputeKernel(concretizedAssign, content->module);
+}
+
+
 taco_tensor_t* TensorBase::getTacoTensorT() {
   return getStorage();
 }

@@ -538,6 +538,13 @@ LowererImplImperative::lower(IndexStmt stmt, string name,
 }
 
 
+Stmt
+LowererImplImperative::lower(IndexStmt stmt, std::map<TensorVar, IndexStmt> helperStmts, string name,
+                             bool assemble, bool compute, bool pack, bool unpack){
+  this->helperStmts = helperStmts;
+  return lower(stmt, name, assemble, compute, pack, unpack);
+}
+
 Stmt LowererImplImperative::lowerAssignment(Assignment assignment)
 {
   taco_iassert(generateAssembleCode() || generateComputeCode());
@@ -2781,9 +2788,6 @@ Stmt LowererImplImperative::lowerWhere(Where where) {
   );
   Stmt consumer = Stmt();
   if(this->compute && !spTemporaryVars.empty()) {
-    this->assemble = true;
-    this->compute = true;
-
     IndexStmt stmt = where.getConsumer();
     struct FormatVisitor: public IndexNotationVisitor {
       using IndexNotationVisitor::visit;
@@ -2829,8 +2833,18 @@ Stmt LowererImplImperative::lowerWhere(Where where) {
     FormatRewriter FmtRewriter(newExpr);
     CheckVisitor ChkVisitor(this->spTemporaryVars);
     FmtVisitor.visit(stmt);
-    FmtRewriter.rewrite(stmt);
-    ChkVisitor.visit(stmt);
+    IndexStmt packStmt;
+    cout<<"helperStmts: "<<endl;
+    for (auto& s: helperStmts) {
+      cout<<s.first<<",";
+      if(s.first.getName() == tensor.getName()) {
+        packStmt = s.second;
+        break;
+      }
+    }
+    cout<<endl;
+    FmtRewriter.rewrite(packStmt);
+    ChkVisitor.visit(packStmt);
     // Change the iterators
     std::pair<TensorVar, ir::Expr> original;
 
@@ -2844,11 +2858,13 @@ Stmt LowererImplImperative::lowerWhere(Where where) {
     tensorVars.insert({exchangedTensor,original.second});
     iterators = Iterators(originalStmt, tensorVars);
     // End Changing
-    consumer = lower(stmt);
+    this->assemble = true;
+    this->compute = true;
+    consumer = lower(packStmt);
 
-    FmtVisitor.visit(stmt);
-    FmtRewriter.rewrite(stmt);
-    ChkVisitor.visit(where.getConsumer());
+    FmtVisitor.visit(packStmt);
+    FmtRewriter.rewrite(packStmt);
+    ChkVisitor.visit(packStmt);
     // Change the iterators back
     tensorVars.erase(exchangedTensor);
     tensorVars.insert(original);

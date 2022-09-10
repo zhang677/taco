@@ -653,6 +653,42 @@ TEST(DISABLED_scheduling_eval, spWorkspace) {
   ASSERT_TENSOR_EQ(expected, B);
 }
 
+TEST(scheduling_eval, spFormat) {
+  int NUM_I = 50;
+  int NUM_J = 50;
+  float SPARSITY = .2;
+  Format WFormat = COO(2, true, true, false, {0, 1});
+  Format cFormat = CSR;
+  Tensor<float> W("W", {NUM_I, NUM_J}, WFormat);
+  Tensor<float> C("C", {NUM_I, NUM_J}, cFormat);
+  srand(75883);
+  for (int i = 0; i < NUM_I; i++) {
+    for (int j = 0; j < NUM_J; j++) {
+      float rand_float = (float) rand() / (float) (RAND_MAX);
+      if (rand_float < SPARSITY) {
+        W.insert({i, j}, (float) ((int) (rand_float * 3 / SPARSITY)));
+      }
+    }
+  }
+  W.pack();
+  C(i, k) = W(i, k);
+  IndexStmt packStmt = generatePackStmt(C(i,k).getTensorVar(), "W", WFormat, C(i,k).getIndexVars(), true);
+  // IndexStmt stmt = C.getAssignment().concretize();
+  // C.compile(stmt, true);
+  C.compile(packStmt, true);
+  //C.assemble();
+  C.compute();
+/*
+  Tensor<float> expected("expected", {NUM_I, NUM_J}, {Dense, Dense});
+  expected(i, k) = W(i, k);
+  stmt = expected.getAssignment().concretize();
+  expected.compile();
+  expected.assemble();
+  expected.compute();
+  ASSERT_TENSOR_EQ(expected, C);
+  */
+  ASSERT_EQ(1, 1);
+}
 
 TEST(scheduling_eval, spWS) {
   int NUM_I = 50;
@@ -716,8 +752,11 @@ TEST(scheduling_eval, spWS) {
   //stmt = stmt.precompute(precomputedExpr, {i,k}, {iw,kw}, W);
   stmt = stmt.precompute(precomputedExpr, {i,k}, {i,k}, W);
   cout<<"stmt: "<<stmt<<endl;
+  IndexStmt packStmt = generateSpPackStmt(C(i,k).getTensorVar(), "W", wFormat, C(i,k).getIndexVars(), true);
+  std::map<TensorVar, IndexStmt> helperStmts;
 
-  C.compile(stmt);
+  helperStmts.insert({W, packStmt});
+  C.compile(stmt, helperStmts);
   C.assemble();
   std::cout<<"Compilation over!"<<std::endl;
   C.compute();

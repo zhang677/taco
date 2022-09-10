@@ -1384,5 +1384,8 @@ IndexStmt generatePackStmt(TensorVar tensor,
 IndexStmt generatePackCOOStmt(TensorVar tensor, 
                               std::vector<IndexVar> indexVars, bool otherIsOnRight);
 
+IndexStmt generateSpPackStmt(TensorVar tensor, std::string otherName, SpFormat otherFormat,
+                             std::vector<IndexVar> indexVars, bool otherIsOnRight);
+
 }
 #endif

@@ -58,6 +58,9 @@ public:
   ir::Stmt lower(IndexStmt stmt, std::string name, 
                  bool assemble, bool compute, bool pack, bool unpack);
 
+  ir::Stmt lower(IndexStmt stmt, std::map<TensorVar, IndexStmt> helperStmts, std::string name,
+                 bool assemble, bool compute, bool pack, bool unpack);
+
 protected:
 
   /// Lower an assignment statement.
@@ -556,6 +559,7 @@ private:
   std::map<TensorVar, ir::Expr> spAllCapacity;
   std::map<TensorVar, ir::Expr> spInsertFail;
   std::map<TensorVar, ir::Expr> spPoint;
+  std::map<TensorVar, IndexStmt> helperStmts;
   void createSpAssistVars(const std::set<TensorVar>&);
 
   /// Forall loop depth of producer side

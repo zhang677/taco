@@ -4310,7 +4310,7 @@ bool hasNoForAlls(IndexStmt stmt) {
 }
 
 IndexStmt generatePackStmt(TensorVar tensor, 
-                           std::string otherName, Format otherFormat, 
+                           std::string otherName, Format otherFormat,
                            std::vector<IndexVar> indexVars, 
                            bool otherIsOnRight) { 
 
@@ -4357,4 +4357,42 @@ IndexStmt generatePackCOOStmt(TensorVar tensor,
 
   return generatePackStmt(tensor, tensorName + "_COO", bufferFormat, indexVars, otherIsOnRight);
 }
+
+IndexStmt generateSpPackStmt(TensorVar tensor,
+                           std::string otherName, SpFormat otherFormat,
+                           std::vector<IndexVar> indexVars,
+                           bool otherIsOnRight) {
+
+  const Type type = tensor.getType();
+  TensorVar other(otherName, type, otherFormat);
+
+  const Format format = tensor.getFormat();
+  IndexStmt packStmt = otherIsOnRight ?
+                       (tensor(indexVars) = other(indexVars)) :
+                       (other(indexVars) = tensor(indexVars));
+
+  for (int i = format.getOrder() - 1; i >= 0; --i) {
+    int mode = format.getModeOrdering()[i];
+    packStmt = forall(indexVars[mode], packStmt);
+  }
+
+  bool doAppend = true;
+  const Format lhsFormat = otherIsOnRight ? format : otherFormat;
+  for (int i = lhsFormat.getOrder() - 1; i >= 0; --i) {
+    const auto modeFormat = lhsFormat.getModeFormats()[i];
+    if (modeFormat.isBranchless() && i != 0) {
+      const auto parentModeFormat = lhsFormat.getModeFormats()[i - 1];
+      if (parentModeFormat.isUnique() || !parentModeFormat.hasAppend()) {
+        doAppend = false;
+        break;
+      }
+    }
+  }
+  if (!doAppend) {
+    packStmt = packStmt.assemble(otherIsOnRight ? tensor : other, AssembleStrategy::Insert);
+  }
+
+  return packStmt;
+}
+
 }
