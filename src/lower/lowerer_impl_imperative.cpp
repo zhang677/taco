@@ -334,6 +334,9 @@ LowererImplImperative::lower(IndexStmt stmt, string name,
     return Function::make(name, resultsIR, argumentsIR, Block::blanks(Stmt()),wsvars);
   }
 
+  if(!wsvars.empty() && !this->assemble) {
+    this->assemble = true;
+  }
   // Create variables for index sets on result tensors.
   vector<Expr> indexSetArgs;
   for (auto& access : getResultAccesses(stmt).first) {
@@ -506,6 +509,11 @@ LowererImplImperative::lower(IndexStmt stmt, string name,
   // Lower the index statement to compute and/or assemble
   Stmt body = lower(stmt);
 
+  cout<<"resultAccesses: "<<endl;
+  for (auto& r: resultAccesses) {
+    cout<<r<<";";
+  }
+  cout<<endl;
   // Post-process result modes and allocate memory for values if necessary
   Stmt finalizeResults = finalizeResultArrays(resultAccesses);
 
@@ -557,7 +565,9 @@ Stmt LowererImplImperative::lowerAssignment(Assignment assignment)
 
   Expr rhs;
   if (needComputeAssign) {
+    cout<<"rhs: "<<assignment.getRhs()<<endl;
     rhs = lower(assignment.getRhs());
+    cout<<"lowered rhs: "<<rhs<<endl;
   }
 
   // Assignment to scalar variables.
@@ -2787,7 +2797,11 @@ Stmt LowererImplImperative::lowerWhere(Where where) {
         })
   );
   Stmt consumer = Stmt();
+  TensorVar tensor;
   if(this->compute && !spTemporaryVars.empty()) {
+    //this->assemble = true;
+    //this->compute = true;
+
     IndexStmt stmt = where.getConsumer();
     struct FormatVisitor: public IndexNotationVisitor {
       using IndexNotationVisitor::visit;
@@ -2795,7 +2809,7 @@ Stmt LowererImplImperative::lowerWhere(Where where) {
       IndexExpr& newExpr;
       TensorVar& tensor;
       FormatVisitor(std::set<TensorVar> spVars, IndexExpr& newExpr, TensorVar& tensor):
-      spTemporaryVars(spVars.begin(),spVars.end()),newExpr(newExpr),tensor(tensor) {}
+        spTemporaryVars(spVars.begin(),spVars.end()),newExpr(newExpr),tensor(tensor) {}
       void visit(const AccessNode* node) {
         tensor = node->tensorVar;
         if(spTemporaryVars.count(tensor)>0) {
@@ -2828,23 +2842,12 @@ Stmt LowererImplImperative::lowerWhere(Where where) {
       }
     };
     IndexExpr newExpr;
-    TensorVar tensor;
     FormatVisitor FmtVisitor(this->spTemporaryVars, newExpr, tensor);
     FormatRewriter FmtRewriter(newExpr);
     CheckVisitor ChkVisitor(this->spTemporaryVars);
     FmtVisitor.visit(stmt);
-    IndexStmt packStmt;
-    cout<<"helperStmts: "<<endl;
-    for (auto& s: helperStmts) {
-      cout<<s.first<<",";
-      if(s.first.getName() == tensor.getName()) {
-        packStmt = s.second;
-        break;
-      }
-    }
-    cout<<endl;
-    FmtRewriter.rewrite(packStmt);
-    ChkVisitor.visit(packStmt);
+    FmtRewriter.rewrite(stmt);
+    ChkVisitor.visit(stmt);
     // Change the iterators
     std::pair<TensorVar, ir::Expr> original;
 
@@ -2858,20 +2861,18 @@ Stmt LowererImplImperative::lowerWhere(Where where) {
     tensorVars.insert({exchangedTensor,original.second});
     iterators = Iterators(originalStmt, tensorVars);
     // End Changing
-    this->assemble = true;
-    this->compute = true;
-    consumer = lower(packStmt);
+    consumer = lower(stmt);
 
-    FmtVisitor.visit(packStmt);
-    FmtRewriter.rewrite(packStmt);
-    ChkVisitor.visit(packStmt);
+    FmtVisitor.visit(stmt);
+    FmtRewriter.rewrite(stmt);
+    ChkVisitor.visit(where.getConsumer());
     // Change the iterators back
     tensorVars.erase(exchangedTensor);
     tensorVars.insert(original);
     iterators = Iterators(originalStmt, tensorVars);
     // End Changing
-    this->compute = true;
-    this->assemble = false;
+    //this->compute = true;
+    //this->assemble = false;
   } else {
     consumer = lower(where.getConsumer());
   }
@@ -2920,6 +2921,35 @@ Stmt LowererImplImperative::lowerWhere(Where where) {
   Stmt producer = lower(where.getProducer());
   inProducer = false;
 
+  Stmt cornerHandler = ir::Stmt();
+  if(tensor.defined()) {
+    if(tensor.getAccType() == SpFormat::Coord) {
+      std::vector<Expr> SortParameters = {spAccArr[tensor], spAccSize[tensor], ir::Literal::make(false)};
+      Stmt Sort = ir::Assign::make(spAccSize[tensor], ir::Call::make("Sort", SortParameters, Int32));
+      vector<Stmt> EnlargerInner;
+      EnlargerInner.push_back(ir::Assign::make(spAllCapacity[tensor],
+                                               ir::Mul::make(spAllCapacity[tensor], ir::Literal::make(2))));
+      for (int i = 0; i < tensor.getOrder(); i++) {
+        EnlargerInner.push_back(ir::Allocate::make(spAllcrd[tensor][i], spAllCapacity[tensor], true,
+                                                   spAllcrd[tensor][i]));
+      }
+      EnlargerInner.push_back(ir::Allocate::make(spAllvals[tensor], spAccCapacity[tensor], true, spAllvals[tensor]));
+      Stmt Enlarger =Block::make(ir::IfThenElse::make(ir::Gt::make(ir::Add::make(spAccSize[tensor], spAccSize[tensor]),
+                                                                   spAllCapacity[tensor]),
+                                                      ir::Block::make(EnlargerInner)));
+      std::vector<Expr> MergeParameters;
+      for (int i = 0; i < tensor.getOrder(); i++) {
+        MergeParameters.push_back(spAllcrd[tensor][i]);
+      }
+      MergeParameters.insert(MergeParameters.end(), {spAllvals[tensor], spAllSize[tensor], spAccArr[tensor],
+                                                     spAccSize[tensor]});
+      Stmt Merger = ir::Assign::make(spAllSize[tensor], ir::Call::make("Merge_coord", MergeParameters, Int32));
+      Stmt Clear = ir::Assign::make(spAccSize[tensor], ir::Literal::make(0));
+      Stmt cornerHandlerInner = ir::Block::make(Sort, Enlarger, Merger, Clear);
+      cornerHandler = ir::IfThenElse::make(ir::Gt::make(spAccSize[tensor], ir::Literal::make(0)), cornerHandlerInner);
+    }
+  }
+
   if (accelerateDenseWorkSpace) {
     const Expr indexListSizeExpr = tempToIndexListSize.at(temporary);
     const Stmt indexListSizeDecl = VarDecl::make(indexListSizeExpr, ir::Literal::make(0));
@@ -2933,7 +2963,7 @@ Stmt LowererImplImperative::lowerWhere(Where where) {
   whereConsumers.pop_back();
   whereTemps.pop_back();
   whereTempsToResult.erase(where.getTemporary());
-  return Block::make(initializeTemporary, producer, markAssignsAtomicDepth > 0 ? capturedLocatePos : ir::Stmt(), consumer,  freeTemporary);
+  return Block::make(initializeTemporary, producer, markAssignsAtomicDepth > 0 ? capturedLocatePos : ir::Stmt(), cornerHandler, consumer,  freeTemporary);
 }
 
 
@@ -3504,9 +3534,11 @@ ir::Stmt LowererImplImperative::finalizeResultArrays(std::vector<Access> writes)
   bool clearValuesAllocation = false;
   std::vector<Stmt> result;
   for (auto& write : writes) {
-    if (write.getTensorVar().getOrder() == 0 ||
-        isAssembledByUngroupedInsertion(write.getTensorVar())) {
-      continue;
+    if(!spTemporaryVars.empty()) {
+      if (write.getTensorVar().getOrder() == 0 ||
+          isAssembledByUngroupedInsertion(write.getTensorVar())) {
+        continue;
+      }
     }
 
     const auto iterators = getIterators(write);
@@ -3516,11 +3548,14 @@ ir::Stmt LowererImplImperative::finalizeResultArrays(std::vector<Access> writes)
     for (const auto& iterator : iterators) {
       Expr size;
       Stmt finalize;
+      cout<<"Iterator: "<<iterator<<endl;
       // Post-process data structures for storing levels
       if (iterator.hasAppend()) {
+        cout<<"Into hasAppend: "<<endl;
         size = iterator.getPosVar();
         finalize = iterator.getAppendFinalizeLevel(parentSize, size);
       } else if (iterator.hasInsert()) {
+        cout<<"Into hasInsert: "<<endl;
         size = simplify(ir::Mul::make(parentSize, iterator.getWidth()));
         finalize = iterator.getInsertFinalizeLevel(parentSize, size);
       } else {
