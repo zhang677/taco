@@ -504,8 +504,8 @@ ir::Stmt simplify(const ir::Stmt& stmt) {
       stmt = util::contains(necessaryDecls, decl)? decl : Block::make();
     }
   };
-  simplifiedStmt = RemoveRedundantStmts(copyPropagation.necessaryDecls).rewrite(
-      simplifiedStmt);
+  //simplifiedStmt = RemoveRedundantStmts(copyPropagation.necessaryDecls).rewrite(
+  //    simplifiedStmt);
 
   // Eliminate loops that only increment variables.
   struct RemoveRedundantLoops : public IRRewriter {

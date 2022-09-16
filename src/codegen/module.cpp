@@ -60,7 +60,9 @@ void Module::compileToSource(string path, string prefix) {
             CodeGen::init_default(header, CodeGen::HeaderGen);
 
     for (auto func: funcs) {
+      cout<<"Source codegen: "<<endl;
       sourcegen->compile(func, !didGenRuntime);
+      cout<<"Head codegen: "<<endl;
       headergen->compile(func, !didGenRuntime);
       didGenRuntime = true;
     }
@@ -118,7 +120,7 @@ string Module::compile() {
   string cflags;
   string file_ending;
   string shims_file;
-  string ws_file;
+
   if (should_use_CUDA_codegen()) {
     cc = util::getFromEnv("TACO_NVCC", "nvcc");
     cflags = util::getFromEnv("TACO_NVCCFLAGS",

@@ -181,6 +181,8 @@ public:
 
   vector<Expr> localVars;
 
+  bool isSparseWorkspace = false;
+
   // this maps from tensor, property, mode, index to the unique var
   map<tuple<Expr, TensorProperty, int, int>, string> canonicalPropertyVar;
 
@@ -218,7 +220,11 @@ protected:
 
   virtual void visit(const Var *op) {
     if (varMap.count(op) == 0) {
-      varMap[op] = op->is_ptr? op->name : codeGen->genUniqueName(op->name);
+      if(isSparseWorkspace) {
+        varMap[op] = op->name;
+      } else {
+        varMap[op] = op->is_ptr ? op->name : codeGen->genUniqueName(op->name);
+      }
     }
   }
 
@@ -292,12 +298,14 @@ void CodeGen_C::visit(const Function* func) {
     out << "#ifndef TACO_GENERATED_" << func->name << "\n";
     out << "#define TACO_GENERATED_" << func->name << "\n";
   }
-  if (IsFirst && outputKind == ImplementationGen && !(func->wsvars).empty()) {
-    out << printWsFuncs(func->wsvars) << endl;
+  if (!(func->wsvars).empty()) {
+    if(outputKind == ImplementationGen && IsFirst) {
+      out << printWsFuncs(func->wsvars) << endl;
+      IsFirst = false;
+    }
     for(auto& var: func->wsvars) {
       wsVarNames.insert(var.first);
     }
-    IsFirst = false;
   }
   int numYields = countYields(func);
   emittingCoroutine = (numYields > 0);
@@ -309,11 +317,10 @@ void CodeGen_C::visit(const Function* func) {
   func->body.accept(&inputVarFinder);
   FindVars outputVarFinder({}, func->outputs, this);
   func->body.accept(&outputVarFinder);
-
   // output function declaration
   doIndent();
   out << printFuncName(func, inputVarFinder.varDecls, outputVarFinder.varDecls);
-
+  cout << printFuncName(func, inputVarFinder.varDecls, outputVarFinder.varDecls) << endl;
   // if we're just generating a header, this is all we need to do
   if (outputKind == HeaderGen) {
     out << ";\n";
@@ -328,9 +335,13 @@ void CodeGen_C::visit(const Function* func) {
   // find all the vars that are not inputs or outputs and declare them
   resetUniqueNameCounters();
   FindVars varFinder(func->inputs, func->outputs, this);
+  if(!wsVarNames.empty()) {
+    varFinder.isSparseWorkspace = true;
+  }
   func->body.accept(&varFinder);
   varMap = varFinder.varMap;
   localVars = varFinder.localVars;
+
 
   // Print variable declarations
   out << printDecls(varFinder.varDecls, func->inputs, func->outputs) << endl;
@@ -339,6 +350,7 @@ void CodeGen_C::visit(const Function* func) {
     out << printContextDeclAndInit(varMap, localVars, numYields, func->name)
         << endl;
   }
+
   // output body
   print(func->body); // LLIR code
 
@@ -528,7 +540,7 @@ void CodeGen_C::visit(const GetProperty* op) {
       }
     }
     taco_iassert(varMap.count(temp) > 0) <<
-                      "Property " << temp << " of " << op->tensor << " is found in varMap" <<endl;
+                      "Property " << temp << " of " << op->tensor << " not found in varMap" <<endl;
     out << varMap[temp];
   }
 }
@@ -651,6 +663,16 @@ void CodeGen_C::generateShim(const Stmt& func, stringstream &ret) {
   }
   for (auto input : funcPtr->inputs) {
     auto var = input.as<Var>();
+    bool isSpWS = false;
+    for(auto& ws: funcPtr->wsvars) {
+      if (var->name == ws.first) {
+        isSpWS = true;
+        break;
+      }
+    }
+    if (isSpWS) {
+      break;
+    }
     auto cast_type = var->is_tensor ? "taco_tensor_t*"
     : printCType(var->type, var->is_ptr);
     ret << delimiter << "(" << cast_type << ")(parameterPack[" << i++ << "])";

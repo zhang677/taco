@@ -566,6 +566,7 @@ private:
   int producerForallDepth = -1;
   int SpPointDepth = -1;
   bool inProducer = false;
+  bool inConsumer = false;
 
   /// Map from index variables to their dimensions, currently [0, expr).
   std::map<IndexVar, ir::Expr> dimensions;

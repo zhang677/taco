@@ -533,6 +533,7 @@ string CodeGen::printFuncName(const Function *func,
     auto var = func->outputs[i].as<Var>();
     taco_iassert(var) << "Unable to convert output " << func->outputs[i]
                       << " to Var";
+
     if (var->is_parameter) {
       unfoldOutput = true;
       break;
@@ -559,6 +560,16 @@ string CodeGen::printFuncName(const Function *func,
     auto var = func->inputs[i].as<Var>();
     taco_iassert(var) << "Unable to convert output " << func->inputs[i]
                       << " to Var";
+    bool isSpWS = false;
+    for(auto& ws: func->wsvars) {
+      if (var->name == ws.first) {
+        isSpWS = true;
+        break;
+      }
+    }
+    if (isSpWS) {
+      break;
+    }
     if (var->is_parameter) {
       unfoldInput = true;
       break;

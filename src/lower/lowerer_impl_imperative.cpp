@@ -2850,7 +2850,6 @@ Stmt LowererImplImperative::lowerWhere(Where where) {
     ChkVisitor.visit(stmt);
     // Change the iterators
     std::pair<TensorVar, ir::Expr> original;
-
     for (auto& tensorVar : tensorVars) {
       if(tensor.getName()==tensorVar.first.getName()) {
         original = tensorVar;
@@ -2861,8 +2860,10 @@ Stmt LowererImplImperative::lowerWhere(Where where) {
     tensorVars.insert({exchangedTensor,original.second});
     iterators = Iterators(originalStmt, tensorVars);
     // End Changing
+    inConsumer = true;
     consumer = lower(stmt);
-
+    inConsumer = false;
+    // Restore format
     FmtVisitor.visit(stmt);
     FmtRewriter.rewrite(stmt);
     ChkVisitor.visit(where.getConsumer());
@@ -3350,6 +3351,14 @@ Expr LowererImplImperative::getCapacityVar(Expr tensor) const {
 
 ir::Expr LowererImplImperative::getValuesArray(TensorVar var) const
 {
+  if(inConsumer) {
+    if (spTemporaryVars.count(var) > 0) {
+      for (auto &t: spAllvals) {
+        if (t.first.getName() == var.getName())
+          return t.second;
+      }
+    }
+  }
   return (util::contains(temporaryArrays, var))
          ? temporaryArrays.at(var).values
          : GetProperty::make(getTensorVar(var), TensorProperty::Values);
@@ -3548,14 +3557,11 @@ ir::Stmt LowererImplImperative::finalizeResultArrays(std::vector<Access> writes)
     for (const auto& iterator : iterators) {
       Expr size;
       Stmt finalize;
-      cout<<"Iterator: "<<iterator<<endl;
       // Post-process data structures for storing levels
       if (iterator.hasAppend()) {
-        cout<<"Into hasAppend: "<<endl;
         size = iterator.getPosVar();
         finalize = iterator.getAppendFinalizeLevel(parentSize, size);
       } else if (iterator.hasInsert()) {
-        cout<<"Into hasInsert: "<<endl;
         size = simplify(ir::Mul::make(parentSize, iterator.getWidth()));
         finalize = iterator.getInsertFinalizeLevel(parentSize, size);
       } else {
