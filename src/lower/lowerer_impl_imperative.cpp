@@ -360,7 +360,6 @@ LowererImplImperative::lower(IndexStmt stmt, string name,
     tensorVars.insert({temp, irVar});
   }
   vector<Expr> spTempIR = createVars(sparseTemporaries, &tensorVars);
-  argumentsIR.insert(argumentsIR.end(), spTempIR.begin(), spTempIR.end());
 
   cout<<"argumentsIR: "<<endl;
   for(auto& r: argumentsIR) {
@@ -505,11 +504,6 @@ LowererImplImperative::lower(IndexStmt stmt, string name,
   // Lower the index statement to compute and/or assemble
   Stmt body = lower(stmt);
 
-  cout<<"resultAccesses: "<<endl;
-  for (auto& r: resultAccesses) {
-    cout<<r<<";";
-  }
-  cout<<endl;
   // Post-process result modes and allocate memory for values if necessary
   Stmt finalizeResults = finalizeResultArrays(resultAccesses);
 
@@ -538,7 +532,8 @@ LowererImplImperative::lower(IndexStmt stmt, string name,
                                         body,
                                         finalizeResults,
                                         Block::make(footer)),
-                                        wsvars);
+                                        wsvars,
+                                        spTempIR);
 }
 
 
@@ -2290,11 +2285,6 @@ Stmt LowererImplImperative::lowerForallBody(Expr coordinate, IndexStmt stmt,
   }
 
   Stmt incr = Block::make(stmts);
-
-  // TODO: Emit code to insert coordinates
-  std::cout<<"Sparse Producer level: "<<producerForallDepth<<std::endl;
-  std::cout<<"declInserter: "<<declInserterPosVars<<std::endl;
-  std::cout<<"declLocator: "<<declLocatorPosVars<<std::endl;
 
   return Block::make(initVals,
                      declInserterPosVars,

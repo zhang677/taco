@@ -320,7 +320,6 @@ void CodeGen_C::visit(const Function* func) {
   // output function declaration
   doIndent();
   out << printFuncName(func, inputVarFinder.varDecls, outputVarFinder.varDecls);
-  cout << printFuncName(func, inputVarFinder.varDecls, outputVarFinder.varDecls) << endl;
   // if we're just generating a header, this is all we need to do
   if (outputKind == HeaderGen) {
     out << ";\n";
@@ -334,7 +333,11 @@ void CodeGen_C::visit(const Function* func) {
 
   // find all the vars that are not inputs or outputs and declare them
   resetUniqueNameCounters();
-  FindVars varFinder(func->inputs, func->outputs, this);
+  std::vector<Expr> allInputs = func->inputs;
+  if(!(func->sparseWS).empty()) {
+    allInputs.insert(allInputs.end(), (func->sparseWS).begin(), (func->sparseWS).end());
+  }
+  FindVars varFinder(allInputs, func->outputs, this);
   if(!wsVarNames.empty()) {
     varFinder.isSparseWorkspace = true;
   }
@@ -663,16 +666,6 @@ void CodeGen_C::generateShim(const Stmt& func, stringstream &ret) {
   }
   for (auto input : funcPtr->inputs) {
     auto var = input.as<Var>();
-    bool isSpWS = false;
-    for(auto& ws: funcPtr->wsvars) {
-      if (var->name == ws.first) {
-        isSpWS = true;
-        break;
-      }
-    }
-    if (isSpWS) {
-      break;
-    }
     auto cast_type = var->is_tensor ? "taco_tensor_t*"
     : printCType(var->type, var->is_ptr);
     ret << delimiter << "(" << cast_type << ")(parameterPack[" << i++ << "])";

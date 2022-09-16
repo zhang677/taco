@@ -60,9 +60,7 @@ void Module::compileToSource(string path, string prefix) {
             CodeGen::init_default(header, CodeGen::HeaderGen);
 
     for (auto func: funcs) {
-      cout<<"Source codegen: "<<endl;
       sourcegen->compile(func, !didGenRuntime);
-      cout<<"Head codegen: "<<endl;
       headergen->compile(func, !didGenRuntime);
       didGenRuntime = true;
     }
