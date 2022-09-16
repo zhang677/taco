@@ -249,12 +249,8 @@ void LowererImplImperative::createSpAssistVars(const std::set<TensorVar>& tensor
     for(int i = 0; i < tensor.getOrder(); i++) {
       Allcrd.push_back(Var::make(tensor.getName()+ to_string(i+1) + "_crd", Int32, true, false));
     }
-    std::vector<Expr> AllPos;
-    for(int i = 0; i < tensor.getOrder(); i++) {
-      AllPos.push_back(Var::make(tensor.getName()+ to_string(i+1) + "_pos", Int32, true, false));
-    }
     this->spAllcrd.insert({tensor, Allcrd});
-    this->spAllPos.insert({tensor, AllPos});
+    this->spAllPos.insert({tensor, Var::make(tensor.getName()+ to_string(1) + "_pos", Int32, true, false)});
     this->spAllvals.insert({tensor, Var::make(tensor.getName() + "_vals", tensor.getType().getDataType(), true, false)});
     this->spInsertFail.insert({tensor, Var::make(tensor.getName() + "_insertFail", Bool, true, false)});
     this->spPoint.insert({tensor, Var::make(tensor.getName() + "_point", Int32, true, false)});
@@ -700,10 +696,10 @@ Stmt LowererImplImperative::lowerAssignment(Assignment assignment)
           EnlargerInner.push_back(ir::Allocate::make(spAllcrd[result][i],spAllCapacity[result],true,
                                                      spAllcrd[result][i]));
         }
-        EnlargerInner.push_back(ir::Allocate::make(spAllvals[result],spAccCapacity[result],true,spAllvals[result]));
+        EnlargerInner.push_back(ir::Allocate::make(spAllvals[result],spAllCapacity[result],true,spAllvals[result]));
         Stmt Enlarger = ir::IfThenElse::make(Load::make(spInsertFail[result],ir::Literal::make(0)),
                                              Block::make(
-         ir::IfThenElse::make(ir::Gt::make(ir::Add::make(spAccSize[result],spAccSize[result]),spAllCapacity[result]),
+         ir::IfThenElse::make(ir::Gt::make(ir::Add::make(spAccSize[result],spAllSize[result]),spAllCapacity[result]),
             ir::Block::make(EnlargerInner))));
         std::vector<Expr> MergeParameters;
         for(int i = 0; i < result.getOrder(); i++) {
@@ -2708,16 +2704,8 @@ vector<Stmt> LowererImplImperative::codeToInitializeSpTemporary(Where where){
   }
   Stmt allValDecl = VarDecl::make(spAllvals[temporary], ir::Literal::make(0));
   Stmt allocAllVal = Allocate::make(spAllvals[temporary], spAllCapacity[temporary]);
-  vector<Stmt> allPosDecl; // TODO: Add position array decl and alloc
-  vector<Stmt> allocAllPos;
-  for (int i = 0; i < temporary.getOrder(); i++) {
-    allPosDecl.push_back(VarDecl::make(spAllPos[temporary][i], ir::Literal::make(0)));
-    if (i == 0) {
-      allocAllPos.push_back(Allocate::make(spAllPos[temporary][i], ir::Literal::make(2)));
-    } else {
-      allocAllPos.push_back(Allocate::make(spAllPos[temporary][i], spAllCapacity[temporary]));
-    }
-  }
+  Stmt allPosDecl = VarDecl::make(spAllPos[temporary], ir::Literal::make(0)); // TODO: Add position array decl and alloc
+  Stmt allocAllPos = Allocate::make(spAllPos[temporary], ir::Literal::make(2));
 
   Stmt insertFailDecl = VarDecl::make(spInsertFail[temporary], ir::Literal::make(0));
   Stmt allocInsertFailDecl = Allocate::make(spInsertFail[temporary], ir::Literal::make(1));
@@ -2733,11 +2721,9 @@ vector<Stmt> LowererImplImperative::codeToInitializeSpTemporary(Where where){
   Stmt allocSpPoint = Allocate::make(spPoint[temporary], temporary.getOrder());
 
   vector<Stmt> Stmts = {accCapacityDecl,accSizeDecl,accArrDecl,allocAccArr,
-                           allCapacityDecl,allSizeDecl};
+                           allCapacityDecl,allSizeDecl,allPosDecl,allocAllPos};
   Stmts.insert(Stmts.end(), allCrdsDecl.begin(), allCrdsDecl.end());
   Stmts.insert(Stmts.end(), allocAllCrds.begin(), allocAllCrds.end());
-  Stmts.insert(Stmts.end(), allPosDecl.begin(), allPosDecl.end());
-  Stmts.insert(Stmts.end(), allocAllPos.begin(), allocAllPos.end());
   Stmts.insert(Stmts.end(), {allValDecl, allocAllVal, insertFailDecl, allocInsertFailDecl, initInsertFailDecl,
                                      initSpWS, SpPointDecl, allocSpPoint});
 
@@ -2749,9 +2735,7 @@ vector<Stmt> LowererImplImperative::codeToInitializeSpTemporary(Where where){
   for(int i = 0; i < temporary.getOrder(); i++) {
     Stmts.push_back(Free::make(spAllcrd[temporary][i]));
   }
-  for(int i = 0; i < temporary.getOrder(); i++) {
-    Stmts.push_back(Free::make(spAllPos[temporary][i]));
-  }
+  Stmts.push_back(Free::make(spAllPos[temporary]));
 
   Stmt freeSpTemporary = Block::make(Stmts);
 
@@ -2924,30 +2908,36 @@ Stmt LowererImplImperative::lowerWhere(Where where) {
 
   Stmt cornerHandler = ir::Stmt();
   if(tensor.defined()) {
-    if(tensor.getAccType() == SpFormat::Coord) {
-      std::vector<Expr> SortParameters = {spAccArr[tensor], spAccSize[tensor], ir::Literal::make(false)};
-      Stmt Sort = ir::Assign::make(spAccSize[tensor], ir::Call::make("Sort", SortParameters, Int32));
-      vector<Stmt> EnlargerInner;
-      EnlargerInner.push_back(ir::Assign::make(spAllCapacity[tensor],
-                                               ir::Mul::make(spAllCapacity[tensor], ir::Literal::make(2))));
-      for (int i = 0; i < tensor.getOrder(); i++) {
-        EnlargerInner.push_back(ir::Allocate::make(spAllcrd[tensor][i], spAllCapacity[tensor], true,
-                                                   spAllcrd[tensor][i]));
+    if(tensor.getAccType() != SpFormat::None) {
+      if (tensor.getAccType() == SpFormat::Coord) {
+        std::vector<Expr> SortParameters = {spAccArr[tensor], spAccSize[tensor], ir::Literal::make(false)};
+        Stmt Sort = ir::Assign::make(spAccSize[tensor], ir::Call::make("Sort", SortParameters, Int32));
+        vector<Stmt> EnlargerInner;
+        EnlargerInner.push_back(ir::Assign::make(spAllCapacity[tensor],
+                                                 ir::Mul::make(spAllCapacity[tensor], ir::Literal::make(2))));
+        for (int i = 0; i < tensor.getOrder(); i++) {
+          EnlargerInner.push_back(ir::Allocate::make(spAllcrd[tensor][i], spAllCapacity[tensor], true,
+                                                     spAllcrd[tensor][i]));
+        }
+        EnlargerInner.push_back(ir::Allocate::make(spAllvals[tensor], spAllCapacity[tensor], true, spAllvals[tensor]));
+        Stmt Enlarger = Block::make(
+          ir::IfThenElse::make(ir::Gt::make(ir::Add::make(spAccSize[tensor], spAllSize[tensor]),
+                                            spAllCapacity[tensor]),
+                               ir::Block::make(EnlargerInner)));
+        std::vector<Expr> MergeParameters;
+        for (int i = 0; i < tensor.getOrder(); i++) {
+          MergeParameters.push_back(spAllcrd[tensor][i]);
+        }
+        MergeParameters.insert(MergeParameters.end(), {spAllvals[tensor], spAllSize[tensor], spAccArr[tensor],
+                                                       spAccSize[tensor]});
+        Stmt Merger = ir::Assign::make(spAllSize[tensor], ir::Call::make("Merge_coord", MergeParameters, Int32));
+        Stmt Clear = ir::Assign::make(spAccSize[tensor], ir::Literal::make(0));
+        Stmt cornerHandlerInner = ir::Block::make(Sort, Enlarger, Merger, Clear);
+        cornerHandler = ir::IfThenElse::make(ir::Gt::make(spAccSize[tensor], ir::Literal::make(0)), cornerHandlerInner);
       }
-      EnlargerInner.push_back(ir::Allocate::make(spAllvals[tensor], spAccCapacity[tensor], true, spAllvals[tensor]));
-      Stmt Enlarger =Block::make(ir::IfThenElse::make(ir::Gt::make(ir::Add::make(spAccSize[tensor], spAccSize[tensor]),
-                                                                   spAllCapacity[tensor]),
-                                                      ir::Block::make(EnlargerInner)));
-      std::vector<Expr> MergeParameters;
-      for (int i = 0; i < tensor.getOrder(); i++) {
-        MergeParameters.push_back(spAllcrd[tensor][i]);
-      }
-      MergeParameters.insert(MergeParameters.end(), {spAllvals[tensor], spAllSize[tensor], spAccArr[tensor],
-                                                     spAccSize[tensor]});
-      Stmt Merger = ir::Assign::make(spAllSize[tensor], ir::Call::make("Merge_coord", MergeParameters, Int32));
-      Stmt Clear = ir::Assign::make(spAccSize[tensor], ir::Literal::make(0));
-      Stmt cornerHandlerInner = ir::Block::make(Sort, Enlarger, Merger, Clear);
-      cornerHandler = ir::IfThenElse::make(ir::Gt::make(spAccSize[tensor], ir::Literal::make(0)), cornerHandlerInner);
+      Stmt posPre = ir::Block::make(ir::Store::make(spAllPos[tensor], ir::Literal::make(0), ir::Literal::make(0)),
+                                    ir::Store::make(spAllPos[tensor], ir::Literal::make(1), spAllSize[tensor]));
+      cornerHandler = ir::Block::make(cornerHandler, posPre);
     }
   }
 

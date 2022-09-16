@@ -553,7 +553,7 @@ private:
   std::map<TensorVar, ir::Expr> spAccSize;
   std::map<TensorVar, ir::Expr> spAccCapacity;
   std::map<TensorVar, std::vector<ir::Expr>> spAllcrd;
-  std::map<TensorVar, std::vector<ir::Expr>> spAllPos;
+  std::map<TensorVar, ir::Expr> spAllPos;
   std::map<TensorVar, ir::Expr> spAllvals;
   std::map<TensorVar, ir::Expr> spAllSize;
   std::map<TensorVar, ir::Expr> spAllCapacity;

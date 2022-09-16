@@ -735,7 +735,7 @@ std::string CodeGen::printWsFuncs(std::map<std::string, std::tuple<int, std::str
     for (int i=0; i<order; i++) {
       ret << "      tmp_COO_crd["<<i<<"][target_pointer] = accumulator[accumulator_pointer].crd["<<i<<"];\n";
     }
-    ret << "        tmp_COO_vals[target_pointer] = accumulator[accumulator_pointer].val + COO_vals[content_pointer];\n";
+    ret << "        tmp_COO_vals[target_pointer] = accumulator[accumulator_pointer].val;\n";
     ret << "        accumulator_pointer ++;\n";
     ret << "        target_pointer ++;\n";
     ret << "      } else {\n";
