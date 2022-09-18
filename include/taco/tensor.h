@@ -502,6 +502,7 @@ public:
 
   friend struct AccessTensorNode;
   std::vector<TensorBase> getDependentTensors();
+  void userSetNeedsValueSize(bool needsValueSize);
 private:
   static std::shared_ptr<ir::Module> getHelperFunctions(
       const Format& format, Datatype ctype, const std::vector<int>& dimensions);
@@ -917,6 +918,7 @@ struct TensorBase::Content {
   bool               needsCompile;
   bool               needsAssemble;
   bool               needsCompute;
+  bool               needsValueSize = true;
   std::vector<std::weak_ptr<TensorBase::Content>> dependentTensors;
   unsigned int       uniqueId;
 

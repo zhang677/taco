@@ -770,6 +770,10 @@ void TensorBase::syncDependentTensors() {
   content->dependentTensors.clear();
 }
 
+void TensorBase::userSetNeedsValueSize(bool needsValueSize) {
+  content->needsValueSize = false;
+}
+
 static inline map<TensorVar, TensorBase> getTensors(const IndexExpr& expr) {
   struct GetOperands : public IndexNotationVisitor {
     using IndexNotationVisitor::visit;
@@ -848,14 +852,16 @@ void TensorBase::assemble() {
   for (auto& operand : operands) {
     operand.second.syncValues();
   }
-
   auto arguments = packArguments(*this);
   content->module->callFuncPacked("assemble", arguments.data());
-
   if (!content->assembleWhileCompute) {
     setNeedsAssemble(false);
     taco_tensor_t* tensorData = ((taco_tensor_t*)arguments[0]);
-    content->valuesSize = unpackTensorData(*tensorData, *this);
+    cout<<"Line 4"<<endl;
+    if (content->needsValueSize) {
+      content->valuesSize = unpackTensorData(*tensorData, *this);
+    }
+    cout<<"Line 5"<<endl;
   }
 }
 
@@ -1141,11 +1147,12 @@ bool equals(const TensorBase& a, const TensorBase& b) {
     return false;
   }
 
+  cout<<"Check FillValue: "<<endl;
   // Fill values must be the same
   if (!equals(a.getFillValue(), b.getFillValue())) {
     return false;
   }
-
+  cout<<"End Check FillValue: "<<endl;
   // Orders must be the same
   if (a.getOrder() != b.getOrder()) {
     return false;

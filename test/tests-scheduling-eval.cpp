@@ -676,11 +676,11 @@ TEST(scheduling_eval, spFormat) {
   //IndexStmt packStmt = generatePackStmt(C(i,k).getTensorVar(), "W", WFormat, C(i,k).getIndexVars(), true);
   //IndexStmt packStmt = generatePackCOOStmt(C(i,k).getTensorVar(), C(i,k).getIndexVars(), true);
   IndexStmt stmt = C.getAssignment().concretize();
-  C.compile(stmt, true);
+  C.compile(stmt);
   //C.compile(packStmt, true);
-  //C.assemble();
+  C.assemble();
   C.compute();
-/*
+
   Tensor<float> expected("expected", {NUM_I, NUM_J}, {Dense, Dense});
   expected(i, k) = W(i, k);
   stmt = expected.getAssignment().concretize();
@@ -688,9 +688,9 @@ TEST(scheduling_eval, spFormat) {
   expected.assemble();
   expected.compute();
   ASSERT_TENSOR_EQ(expected, C);
-  */
+
   //ASSERT_TENSOR_EQ(W, C);
-  ASSERT_EQ(1, 1);
+  //ASSERT_EQ(1, 1);
 }
 
 TEST(scheduling_eval, spWS) {
@@ -710,6 +710,7 @@ TEST(scheduling_eval, spWS) {
   Tensor<float> A("A",{NUM_I, NUM_J},aFormat);
   Tensor<float> B("B",{NUM_J, NUM_K},bFormat);
   Tensor<float> C("C",{NUM_I, NUM_K},cFormat);
+  C.userSetNeedsValueSize(false);
   srand(75883);
   for (int i = 0; i < NUM_I; i++) {
     for (int j = 0; j < NUM_J; j++) {
@@ -762,8 +763,11 @@ TEST(scheduling_eval, spWS) {
 
   helperStmts.insert({W, packStmt});
   C.compile(stmt, helperStmts);
+  cout<<"Running assemble"<<endl;
   C.assemble();
+  cout<<"Running compute"<<endl;
   C.compute();
+  cout<<"Running compute over!"<<endl;
 
   Tensor<float> expected("expected", {NUM_I, NUM_K}, {Dense, Dense});
   expected(i, k) = A(i, j) * B(j, k);
@@ -773,7 +777,7 @@ TEST(scheduling_eval, spWS) {
   expected.compile();
   expected.assemble();
   expected.compute();
-
+  cout<<"Expected over!"<<endl;
   ASSERT_TENSOR_EQ(expected, C);
   //ASSERT_EQ(1,1);
 

@@ -207,7 +207,7 @@ static std::set<Expr> hasSparseInserts(IndexStmt stmt, Iterators iterators,
     function<void(const ForallNode*,Matcher*)>([&](const ForallNode* op, 
                                                    Matcher* ctx) {
       definedIndexVars.insert(op->indexVar);
-      std::cout<<"ForallMatch:"<<(op->stmt)<<std::endl;
+      //std::cout<<"ForallMatch:"<<(op->stmt)<<std::endl;
       const auto lattice = MergeLattice::make(Forall(op), iterators, 
                                               provGraph, definedIndexVars);
 
@@ -312,7 +312,6 @@ LowererImplImperative::lower(IndexStmt stmt, string name,
   tensorVars.insert(resultVars.begin(), resultVars.end());
   vector<Expr> argumentsIR = createVars(arguments, &tensorVars, pack);
 
-
   // Add sparse workspace tensor variables
   std::map<std::string,std::tuple<int,std::string>> wsvars;
   for (auto& var: spTemporaryVars) {
@@ -327,9 +326,8 @@ LowererImplImperative::lower(IndexStmt stmt, string name,
 
   // Assemble the sparse workspace: return 0;
   if(!wsvars.empty() && this->assemble) {
-    return Function::make(name, resultsIR, argumentsIR, Block::blanks(Stmt()),wsvars);
+    return Function::make(name, resultsIR, argumentsIR, Block::blanks(Stmt()));
   }
-
   if(!wsvars.empty() && !this->assemble) {
     this->assemble = true;
   }
@@ -377,6 +375,7 @@ LowererImplImperative::lower(IndexStmt stmt, string name,
   iterators = Iterators(stmt, tensorVars);
 
   // Print Iterators
+  /*
   std::cout<<"ModeIterators: "<<std::endl;
   for(auto &modeit: iterators.modeIterators()) {
     std::cout<<modeit.first<<":"<<modeit.second<<";";
@@ -387,6 +386,7 @@ LowererImplImperative::lower(IndexStmt stmt, string name,
     std::cout<<modeit.first<<":"<<modeit.second<<";";
   }
   std::cout<<std::endl;
+   */
 
   provGraph = ProvenanceGraph(stmt);
 
@@ -524,7 +524,6 @@ LowererImplImperative::lower(IndexStmt stmt, string name,
       }
     }
   }
-
   // Create function
   return Function::make(name, resultsIR, argumentsIR,
                           Block::blanks(Block::make(header),
@@ -937,8 +936,8 @@ Stmt LowererImplImperative::lowerForall(Forall forall)
 
 
 
-  std::cout<<"temporaryValuesInit: "<<std::endl;
-  std::cout<<temporaryValuesInitFree[0];
+  //std::cout<<"temporaryValuesInit: "<<std::endl;
+  //std::cout<<temporaryValuesInitFree[0];
   Stmt loops;
   // Emit a loop that iterates over over a single iterator (optimization)
   if (caseLattice.iterators().size() == 1 && caseLattice.iterators()[0].isUnique()) {
@@ -946,7 +945,7 @@ Stmt LowererImplImperative::lowerForall(Forall forall)
 
     MergePoint point = loopLattice.points()[0];
     Iterator iterator = loopLattice.iterators()[0];
-    std::cout<<"Loop iterators: "<<util::join(loopLattice.iterators(), ", ")<<std::endl;
+    //std::cout<<"Loop iterators: "<<util::join(loopLattice.iterators(), ", ")<<std::endl;
 
     vector<Iterator> locators = point.locators();
     vector<Iterator> appenders;

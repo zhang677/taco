@@ -299,9 +299,12 @@ void CodeGen_C::visit(const Function* func) {
     out << "#define TACO_GENERATED_" << func->name << "\n";
   }
   if (!(func->wsvars).empty()) {
-    if(outputKind == ImplementationGen && IsFirst) {
+    //if(outputKind == ImplementationGen && IsFirst) {
+    //  out << printWsFuncs(func->wsvars) << endl;
+    //  IsFirst = false;
+    //} // Depends on whether to pass the wsvars in assemble function
+    if(outputKind == ImplementationGen){
       out << printWsFuncs(func->wsvars) << endl;
-      IsFirst = false;
     }
     for(auto& var: func->wsvars) {
       wsVarNames.insert(var.first);
