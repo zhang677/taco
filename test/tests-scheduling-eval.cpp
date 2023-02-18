@@ -111,6 +111,29 @@ IndexStmt scheduleSpGEMMCPU(IndexStmt stmt, bool doPrecompute) {
   return stmt;
 }
 
+IndexStmt scheduleSpGEMMCPUNotParallel(IndexStmt stmt, bool doPrecompute) {
+  Assignment assign = stmt.as<Forall>().getStmt().as<Forall>().getStmt()
+    .as<Forall>().getStmt().as<Assignment>();
+  TensorVar result = assign.getLhs().getTensorVar();
+  stmt = reorderLoopsTopologically(stmt);
+  if (doPrecompute) {
+    IndexVar k = assign.getLhs().getIndexVars()[1];
+    TensorVar w("w", Type(result.getType().getDataType(),
+                          {result.getType().getShape().getDimension(1)}), taco::dense);
+    stmt = stmt.precompute(assign.getRhs(), k, k, w);
+  }
+  stmt = stmt.assemble(result, AssembleStrategy::Insert, true);
+  auto qi_stmt = stmt.as<Assemble>().getQueries();
+
+  IndexVar qi;
+  if (isa<Where>(qi_stmt)) {
+    qi = qi_stmt.as<Where>().getConsumer().as<Forall>().getIndexVar();
+  } else {
+    qi = qi_stmt.as<Forall>().getIndexVar();
+  }
+  return stmt;
+}
+
 IndexStmt scheduleSpAddCPU(IndexStmt stmt) {
   IndexStmt body = stmt.as<Forall>().getStmt().as<Forall>().getStmt();
   if (isa<Forall>(body)) {
@@ -615,52 +638,67 @@ TEST(scheduling_eval, spmmCPU) {
   ASSERT_TENSOR_EQ(expected, C);
 }
 
-TEST(DISABLED_scheduling_eval, spWorkspace) {
+TEST(scheduling_eval, spWorkspace) {
   int NUM_I = 100;
   int NUM_J = 100;
   int NUM_K = 100;
+  int NUM_M = 100;
   float SPARSITY = .03;
   Format aFormat = COO(3,true,true,false,{0,1,2});
-  Format bFormat = Format{{Dense,Sparse,Sparse},{0,1,2}};
-  Tensor<float> A("A", {NUM_I, NUM_J,NUM_K}, aFormat);
-  Tensor<float> B("B", {NUM_I, NUM_J,NUM_K}, bFormat);
+  Format bFormat = Format{{Dense,Sparse},{0,1}};
+  Tensor<float> A("A", {NUM_I, NUM_M,NUM_K}, aFormat);
+  Tensor<float> B("B", {NUM_M,NUM_J}, bFormat);
+  Tensor<float> C("C", {NUM_I,NUM_J,NUM_K}, {Sparse,Sparse,Sparse});
   Tensor<float> expected("expected", {NUM_I,NUM_J,NUM_K}, {Dense,Dense,Dense});
   srand(75883);
   for (int i = 0; i < NUM_I; i++) {
-    for (int j = 0; j < NUM_J; j++) {
+    for (int m = 0; m < NUM_M; m++) {
       for (int k = 0; k < NUM_K; k++) {
         float rand_float = (float) rand() / (float) (RAND_MAX);
         if (rand_float < SPARSITY) {
-          A.insert({i, j, k}, (float) ((int) (rand_float * 3 / SPARSITY)));
+          A.insert({i, m, k}, (float) ((int) (rand_float * 3 / SPARSITY)));
         }
       }
     }
   }
+  for (int m = 0; m < NUM_M; m++) {
+    for (int j = 0; j < NUM_J; j++) {
+      float rand_float = (float) rand() / (float) (RAND_MAX);
+      if (rand_float < SPARSITY) {
+        B.insert({m, j}, (float) ((int) (rand_float * 3 / SPARSITY)));
+      }
+    }
+  }
   A.pack();
+  B.pack();
 
-  B(i,j,k) = A(i,j,k);
+  C(i,j,k) = A(i,m,k) * B(m,j);
 
-  IndexStmt stmt = B.getAssignment().concretize();
+  IndexStmt stmt = C.getAssignment().concretize();
   cout<<"*****"<<endl;
-  B.compile(stmt);
-  B.assemble();
-  B.compute();
+  C.compile(stmt);
+  C.assemble();
+  C.compute();
 
-  expected(i,j,k) = A(i,j,k);
+  expected(i,j,k) = A(i,m,k) * B(m,j);
   expected.compile();
   expected.assemble();
   expected.compute();
-  ASSERT_TENSOR_EQ(expected, B);
+  ASSERT_TENSOR_EQ(expected, C);
 }
 
 TEST(scheduling_eval, spFormat) {
   int NUM_I = 50;
   int NUM_J = 50;
   float SPARSITY = .2;
-  Format WFormat = COO(2, true, true, false, {0, 1});
+  Format WFormat = CSC;
+  //Format WFormat = COO(2, true, true, true, {0, 1});
+  //Format WFormat = CSR;
+  Format bFormat = CSR;
   //Format WFormat = {{Dense,Dense}, {0,1}};
   Format cFormat = CSR;
   Tensor<float> W("W", {NUM_I, NUM_J}, WFormat);
+  Tensor<float> B("B", {NUM_I, NUM_J}, bFormat);
   Tensor<float> C("C", {NUM_I, NUM_J}, cFormat);
   srand(75883);
   for (int i = 0; i < NUM_I; i++) {
@@ -672,7 +710,16 @@ TEST(scheduling_eval, spFormat) {
     }
   }
   W.pack();
-  C(i, k) = W(i, k);
+  for (int i = 0; i < NUM_I; i++) {
+    for (int j = 0; j < NUM_J; j++) {
+      float rand_float = (float) rand() / (float) (RAND_MAX);
+      if (rand_float < SPARSITY) {
+        B.insert({i, j}, (float) ((int) (rand_float * 3 / SPARSITY)));
+      }
+    }
+  }
+  B.pack();
+  C(k, i) = W(k, i) + B(k, i);
   //IndexStmt packStmt = generatePackStmt(C(i,k).getTensorVar(), "W", WFormat, C(i,k).getIndexVars(), true);
   //IndexStmt packStmt = generatePackCOOStmt(C(i,k).getTensorVar(), C(i,k).getIndexVars(), true);
   IndexStmt stmt = C.getAssignment().concretize();
@@ -680,9 +727,10 @@ TEST(scheduling_eval, spFormat) {
   //C.compile(packStmt, true);
   C.assemble();
   C.compute();
+  cout<<C<<endl;
 
   Tensor<float> expected("expected", {NUM_I, NUM_J}, {Dense, Dense});
-  expected(i, k) = W(i, k);
+  expected(k, i) = W(k, i) + B(k, i);
   stmt = expected.getAssignment().concretize();
   expected.compile();
   expected.assemble();
@@ -693,12 +741,55 @@ TEST(scheduling_eval, spFormat) {
   //ASSERT_EQ(1, 1);
 }
 
+TEST(scheduling_eval, spTriWS) {
+  int NUM_I = 50;
+  int NUM_J = 50;
+  int NUM_K = 50;
+  int NUM_L = 50;
+  float SPARSITY = .1;
+  Format aFormat = {Dense, Dense, Dense};
+  Format bFormat = {Sparse, Sparse, Sparse};
+  Format cFormat = CSR;
+  Tensor<double> A("A", {NUM_I, NUM_J, NUM_L}, aFormat); // TODO: change to sparse outputs
+  Tensor<double> B("B", {NUM_I, NUM_J, NUM_K}, bFormat);
+  Tensor<double> C("C", {NUM_K, NUM_L}, cFormat);
+  C.userSetNeedsValueSize(false);
+  SpFormat wFormat = SpFormat(COO(3,true,true,false,{0,1,2}), SpFormat::Coord);
+  TensorVar W("W", Type(Float32,{(size_t)NUM_I, (size_t)NUM_K}), wFormat);
+
+  srand(935);
+  for (int i = 0; i < NUM_I; i++) {
+    for (int j = 0; j < NUM_J; j++) {
+      for (int k = 0; k < NUM_K; k++) {
+        float rand_float = (float) rand() / (float) (RAND_MAX);
+        if (rand_float < SPARSITY) {
+          B.insert({i, j, k}, (double) ((int) (rand_float * 3 / SPARSITY)));
+        }
+      }
+    }
+  }
+
+  for (int k = 0; k < NUM_K; k++) {
+    for (int l = 0; l < NUM_L; l++) {
+      float rand_float = (float)rand()/(float)(RAND_MAX);
+      C.insert({k, l}, (double) ((int) (rand_float*3)));
+    }
+  }
+
+  B.pack();
+  C.pack();
+
+  A(i,j,l) = B(i,j,k) * C(k,l);
+
+  ASSERT_EQ(1,1);
+}
+
 TEST(scheduling_eval, spWS) {
   int NUM_I = 50;
   int NUM_J = 50;
   int NUM_K = 50;
   float SPARSITY = .2;
-  //Format aFormat = COO(2,true,true,false,{0,1});// order, isUnique, isOrdered, isAoS(array-of-struct), modeOrdering
+  // Format aFormat = COO(2,true,true,false,{0,1}); // order, isUnique, isOrdered, isAoS(array-of-struct), modeOrdering
   Format aFormat = CSR;
   Format bFormat = CSR;
   Format cFormat = CSR;
@@ -768,6 +859,7 @@ TEST(scheduling_eval, spWS) {
   cout<<"Running compute"<<endl;
   C.compute();
   cout<<"Running compute over!"<<endl;
+  cout<<C<<endl;
 
   Tensor<float> expected("expected", {NUM_I, NUM_K}, {Dense, Dense});
   expected(i, k) = A(i, j) * B(j, k);
@@ -798,9 +890,10 @@ TEST_P(spgemm, scheduling_eval) {
   int NUM_J = 100;
   int NUM_K = 100;
   float SPARSITY = .03;
+  Format cFormat = COO(2,true,true,false,{0,1});
   Tensor<float> A("A", {NUM_I, NUM_J}, aFormat);
   Tensor<float> B("B", {NUM_J, NUM_K}, bFormat);
-  Tensor<float> C("C", {NUM_I, NUM_K}, CSR);
+  Tensor<float> C("C", {NUM_I, NUM_K}, cFormat);
 
   srand(75883);
   for (int i = 0; i < NUM_I; i++) {
@@ -827,7 +920,8 @@ TEST_P(spgemm, scheduling_eval) {
   C(i, k) = A(i, j) * B(j, k);
   IndexStmt stmt = C.getAssignment().concretize();
   cout<<"*****"<<endl;
-  stmt = scheduleSpGEMMCPU(stmt, doPrecompute);
+  //stmt = scheduleSpGEMMCPU(stmt, doPrecompute);
+  stmt = scheduleSpGEMMCPUNotParallel(stmt, doPrecompute);
 
   C.compile(stmt);
   //C.setAssembleWhileCompute(true);

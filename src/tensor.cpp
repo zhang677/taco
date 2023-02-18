@@ -857,11 +857,9 @@ void TensorBase::assemble() {
   if (!content->assembleWhileCompute) {
     setNeedsAssemble(false);
     taco_tensor_t* tensorData = ((taco_tensor_t*)arguments[0]);
-    cout<<"Line 4"<<endl;
     if (content->needsValueSize) {
       content->valuesSize = unpackTensorData(*tensorData, *this);
     }
-    cout<<"Line 5"<<endl;
   }
 }
 
@@ -1147,12 +1145,11 @@ bool equals(const TensorBase& a, const TensorBase& b) {
     return false;
   }
 
-  cout<<"Check FillValue: "<<endl;
   // Fill values must be the same
   if (!equals(a.getFillValue(), b.getFillValue())) {
     return false;
   }
-  cout<<"End Check FillValue: "<<endl;
+
   // Orders must be the same
   if (a.getOrder() != b.getOrder()) {
     return false;

@@ -3772,7 +3772,13 @@ Stmt LowererImplImperative::declLocatePosVars(vector<Iterator> locators) {
           for (auto &sp: spTemporaryVars) {
             if (tensorVars[sp] == locator.getTensor()) {
               result.pop_back();
+              // cout<<"Sparse Mode: ";
+              // for (auto& t: sp.getFormat().getModeOrdering()) {
+              //   cout<<t<<",";
+              // }
+              // cout<<endl;
               result.push_back(Store::make(spPoint[sp], ir::Literal::make(SpPointDepth++), coords.back()));
+              // result.push_back(Store::make(spPoint[sp], ir::Literal::make(sp.getFormat().getModeOrdering()[SpPointDepth++]), coords.back()));
             }
           }
         }

@@ -504,7 +504,7 @@ ir::Stmt simplify(const ir::Stmt& stmt) {
       stmt = util::contains(necessaryDecls, decl)? decl : Block::make();
     }
   };
-  //simplifiedStmt = RemoveRedundantStmts(copyPropagation.necessaryDecls).rewrite(
+  // simplifiedStmt = RemoveRedundantStmts(copyPropagation.necessaryDecls).rewrite(
   //    simplifiedStmt);
 
   // Eliminate loops that only increment variables.

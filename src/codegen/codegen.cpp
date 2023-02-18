@@ -690,6 +690,25 @@ std::string CodeGen::printWsFuncs(std::map<std::string, std::tuple<int, std::str
     ret << "}" <<endl;
 
     ret << "int Merge_coord("<< crdVariables <<type<<"* COO_vals, int32_t COO_size, "<<clsname<<"* accumulator, int32_t accumulator_size) {\n";
+    ret << "    int p1 = 0;\n";
+    ret << "    int p2 = 1;\n";
+    ret << "    while (p2 < accumulator_size) {\n";
+    ret << "      if ("<<cmpname<<"(&accumulator[p2], &accumulator[p1]) == 0) {\n";
+    ret << "        accumulator[p1].val += accumulator[p2].val;\n";
+    ret << "      } else {\n";
+    ret << "        if (p2 - p1 > 1) {\n";
+    ret << "          p1++;\n";
+    for (int i=0; i<order; i++) {
+      ret << "          accumulator[p1].crd["<< i <<"] = accumulator[p2].crd[" << i <<"];\n";
+    }
+    ret << "            accumulator[p1].val = accumulator[p2].val;\n";
+    ret << "        } else {\n";
+    ret << "          p1++;\n";
+    ret << "        }\n";
+    ret << "      }\n";
+    ret << "      p2++;\n";
+    ret << "    }\n";
+    ret << "    accumulator_size = p1 + 1;\n";
     ret << "    if (COO_size == 0) {\n";
     ret << "      for (int i=0; i<accumulator_size; i++) {\n";
     for (int j=0;j<order;j++) {
@@ -702,7 +721,7 @@ std::string CodeGen::printWsFuncs(std::map<std::string, std::tuple<int, std::str
     ret << "    int32_t* tmp_COO_crd["<< order <<"];\n";
     ret << "    "<<type<<"* tmp_COO_vals;\n";
     for (int i=0;i<order;i++) {
-      ret << "  tmp_COO_crd["<<i<<"] = (int32_t*)malloc(sizeof(int32_t) * (accumulator_size + COO_size));\n";
+      ret << "    tmp_COO_crd["<<i<<"] = (int32_t*)malloc(sizeof(int32_t) * (accumulator_size + COO_size));\n";
     }
     ret << "    tmp_COO_vals = ("<<type<<"*)malloc(sizeof("<<type<<") * (accumulator_size + COO_size));\n";
     ret << "    int accumulator_pointer = 0;\n";
