@@ -232,6 +232,18 @@ static std::set<Expr> hasSparseInserts(IndexStmt stmt, Iterators iterators,
   return ret;
 }
 
+static Expr getPointMode(const TensorVar& ws, int SpPointDepth) {
+  if (ws.getConsumerOrder().empty()) {
+    return ir::Literal::make(SpPointDepth);
+  }
+  int pointMode;
+  for (int index = 0; index < int(ws.getConsumerOrder().size()); index ++){
+    if (SpPointDepth == ws.getConsumerOrder()[index]) {
+      return ir::Literal::make(index);
+    }
+  }
+}
+
 void LowererImplImperative::createSpAssistVars(const std::set<TensorVar>& tensorVars) {
   for (auto& tensor : tensorVars) {
     const std::string accName = tensor.getName() + "_accumulator";
@@ -3777,7 +3789,7 @@ Stmt LowererImplImperative::declLocatePosVars(vector<Iterator> locators) {
               //   cout<<t<<",";
               // }
               // cout<<endl;
-              result.push_back(Store::make(spPoint[sp], ir::Literal::make(SpPointDepth++), coords.back()));
+              result.push_back(Store::make(spPoint[sp], getPointMode(sp,SpPointDepth++), coords.back()));
               // result.push_back(Store::make(spPoint[sp], ir::Literal::make(sp.getFormat().getModeOrdering()[SpPointDepth++]), coords.back()));
             }
           }

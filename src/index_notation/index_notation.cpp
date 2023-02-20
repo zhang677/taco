@@ -2550,6 +2550,7 @@ struct TensorVar::Content {
   std::vector<IndexVar> accelIndexVars;
   bool shouldAccel;
   SpFormat spformat;
+  std::vector<int> ow_order;
 };
 
 TensorVar::TensorVar() : content(nullptr) {
@@ -2575,8 +2576,8 @@ TensorVar::TensorVar(const string& name, const Type& type, const Format& format,
     : TensorVar(-1, name, type, format, fill) {
 }
 
-TensorVar::TensorVar(const std::string& name, const Type& type, const SpFormat& format, const Literal& fill)
-    : TensorVar(-1, name, type, format, fill) {
+TensorVar::TensorVar(const std::string& name, const Type& type, const SpFormat& format, const std::vector<int> ow_order, const Literal& fill)
+    : TensorVar(-1, name, type, format, ow_order, fill) {
 
 }
 
@@ -2590,9 +2591,10 @@ TensorVar::TensorVar(const int& id, const string& name, const Type& type, const 
   content->accelIndexVars = std::vector<IndexVar> {};
   content->shouldAccel = true;
   content->spformat = SpFormat(format,SpFormat::None);
+  content->ow_order = {};
 }
 
-TensorVar::TensorVar(const int &id, const std::string& name, const Type& type, const SpFormat& format, const Literal& fill)
+TensorVar::TensorVar(const int &id, const std::string& name, const Type& type, const SpFormat& format, const std::vector<int> ow_order, const Literal& fill)
     : content(new Content) {
   content->id = id;
   content->name = name;
@@ -2606,9 +2608,8 @@ TensorVar::TensorVar(const int &id, const std::string& name, const Type& type, c
   content->accelIndexVars = std::vector<IndexVar> {};
   content->shouldAccel = true;
   content->spformat = format;
+  content->ow_order = ow_order;
 }
-
-
 
 int TensorVar::getId() const {
   return content->id;
@@ -2661,6 +2662,10 @@ bool TensorVar::getShouldAccel() const {
 
 SpFormat::AccType TensorVar::getAccType() const {
   return content->spformat.getAccType();
+}
+
+const std::vector<int>& TensorVar::getConsumerOrder() const {
+  return content->ow_order;
 }
 
 void TensorVar::setAccelIndexVars(const std::vector<IndexVar>& accelIndexVars, bool shouldAccel) {

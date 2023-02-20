@@ -784,7 +784,7 @@ TEST(scheduling_eval, spTriWS) {
   ASSERT_EQ(1,1);
 }
 
-TEST(scheduling_eval, spWS) {
+TEST(scheduling_eval, spWS_concordant) {
   int NUM_I = 50;
   int NUM_J = 50;
   int NUM_K = 50;
@@ -801,6 +801,7 @@ TEST(scheduling_eval, spWS) {
   Tensor<float> A("A",{NUM_I, NUM_J},aFormat);
   Tensor<float> B("B",{NUM_J, NUM_K},bFormat);
   Tensor<float> C("C",{NUM_I, NUM_K},cFormat);
+  //Tensor<float> C("C",{NUM_K, NUM_I},cFormat);
   C.userSetNeedsValueSize(false);
   srand(75883);
   for (int i = 0; i < NUM_I; i++) {
@@ -825,14 +826,16 @@ TEST(scheduling_eval, spWS) {
   B.pack();
 
   C(i, k) = A(i, j) * B(j, k);
+  //C(k, i) = A(i, j) * B(j, k);
   //TensorVar W("W", Type(Float32,{(size_t)NUM_I, (size_t)NUM_K}), {Dense, Dense});
   //TensorVar W("W", Type(Float32,{(size_t)NUM_I, (size_t)NUM_K}), aFormat);
   TensorVar W("W", Type(Float32,{(size_t)NUM_I, (size_t)NUM_K}), wFormat);
   IndexExpr precomputedExpr = A(i, j) * B(j, k);
   C(i, k) = precomputedExpr;
+  //C(k, i) = precomputedExpr;
   IndexStmt stmt = C.getAssignment().concretize();
   Assignment assign = stmt.as<Forall>().getStmt().as<Forall>().getStmt()
-          .as<Forall>().getStmt().as<Assignment>();
+    .as<Forall>().getStmt().as<Assignment>();
   TensorVar result = assign.getLhs().getTensorVar();
   std::cout<<"*****"<<stmt<<std::endl;
   std::cout<<"wFormat: "<<wFormat<<std::endl;
@@ -848,6 +851,7 @@ TEST(scheduling_eval, spWS) {
   stmt = stmt.precompute(precomputedExpr, {i,k}, {i,k}, W);
   cout<<"stmt: "<<stmt<<endl;
   IndexStmt packStmt = generateSpPackStmt(C(i,k).getTensorVar(), "W", wFormat, C(i,k).getIndexVars(), true);
+  //IndexStmt packStmt = generateSpPackStmt(C(k,i).getTensorVar(), "W", wFormat, C(k,i).getIndexVars(), true);
   cout<<"packStmt: "<<endl;
   cout<<packStmt<<endl;
   std::map<TensorVar, IndexStmt> helperStmts;
@@ -872,7 +876,74 @@ TEST(scheduling_eval, spWS) {
   cout<<"Expected over!"<<endl;
   ASSERT_TENSOR_EQ(expected, C);
   //ASSERT_EQ(1,1);
+}
 
+
+TEST(scheduling_eval, spWS_discordant) {
+  int NUM_I = 50;
+  int NUM_J = 50;
+  int NUM_K = 50;
+  float SPARSITY = .2;
+  // Format aFormat = COO(2,true,true,false,{0,1}); // order, isUnique, isOrdered, isAoS(array-of-struct), modeOrdering
+  Format aFormat = CSR;
+  Format bFormat = CSR;
+  Format cFormat = CSR;
+  SpFormat wFormat = SpFormat(COO(2,true,true,false,{0,1}), SpFormat::Coord);
+  Tensor<float> A("A",{NUM_I, NUM_J},aFormat);
+  Tensor<float> B("B",{NUM_J, NUM_K},bFormat);
+  Tensor<float> C("C",{NUM_K, NUM_I},cFormat);
+  C.userSetNeedsValueSize(false);
+  srand(75883);
+  for (int i = 0; i < NUM_I; i++) {
+    for (int j = 0; j < NUM_J; j++) {
+      float rand_float = (float)rand()/(float)(RAND_MAX);
+      if (rand_float < SPARSITY) {
+        A.insert({i, j}, (float) ((int) (rand_float*3/SPARSITY)));
+      }
+    }
+  }
+
+  for (int j = 0; j < NUM_J; j++) {
+    for (int k = 0; k < NUM_K; k++) {
+      float rand_float = (float)rand()/(float)(RAND_MAX);
+      if (rand_float < SPARSITY) {
+        B.insert({j, k}, (float) ((int) (rand_float*3/SPARSITY)));
+      }
+    }
+  }
+
+  A.pack();
+  B.pack();
+
+  C(k, i) = A(i, j) * B(j, k);
+  TensorVar W("W", Type(Float32,{(size_t)NUM_I, (size_t)NUM_K}), wFormat, {1,0});
+  IndexExpr precomputedExpr = A(i, j) * B(j, k);
+  C(k, i) = precomputedExpr;
+
+  IndexStmt stmt = C.getAssignment().concretize();
+  Assignment assign = stmt.as<Forall>().getStmt().as<Forall>().getStmt()
+    .as<Forall>().getStmt().as<Assignment>();
+  TensorVar result = assign.getLhs().getTensorVar();
+  std::cout<<"*****"<<stmt<<std::endl;
+  std::cout<<"wFormat: "<<wFormat<<std::endl;
+
+  stmt = stmt.reorder({i,j,k});
+  stmt = stmt.precompute(precomputedExpr, {i,k}, {i,k}, W);
+  cout<<"stmt: "<<stmt<<endl;
+  IndexStmt packStmt = generateSpPackStmt(C(k,i).getTensorVar(), "W", wFormat, C(k,i).getIndexVars(), true);
+  cout<<"packStmt: "<<endl;
+  cout<<packStmt<<endl;
+  std::map<TensorVar, IndexStmt> helperStmts;
+  helperStmts.insert({W, packStmt});
+
+  C.compile(stmt, helperStmts);
+  cout<<"Running assemble"<<endl;
+  C.assemble();
+  cout<<"Running compute"<<endl;
+  C.compute();
+  cout<<"Running compute over!"<<endl;
+  cout<<C<<endl;
+  ASSERT_EQ(1,1);
 }
 
 struct spgemm : public TestWithParam<std::tuple<Format,Format,bool>> {};

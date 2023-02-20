@@ -525,7 +525,17 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
                 }
 
                 // Build consumer by replacing with temporary (in replacedStmt)
-                IndexStmt replacedStmt = replace(s, {{e, ws(i_vars) }});
+                IndexStmt replacedStmt;
+                if (ws.getConsumerOrder().empty()) {
+                    replacedStmt = replace(s, {{e, ws(i_vars) }});
+                } else {
+                    std::vector<IndexVar> o_vars;
+                    for (int index = 0; index < (int)i_vars.size(); index++) {
+                      o_vars.push_back(i_vars[ws.getConsumerOrder()[index]]);
+                    }
+                    replacedStmt = replace(s, {{e, ws(o_vars) }});
+                }
+
                 cout<<"ReplacedStmt: "<<replacedStmt<<endl;
                 if (replacedStmt != s) {
                     // Then modify the replacedStmt to have the correct foralls
@@ -536,6 +546,7 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
 
                     auto producerAssignment = getProducerAssignment(ws, i_vars, iw_vars, e, substitutions);
                     auto producerIndexVars = producerAssignment.getIndexVars();
+
 
                     vector<IndexVar> producerForallIndexVars;
                     vector<IndexVar> consumerForallIndexVars;
@@ -560,6 +571,11 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
                         }
                     }
                     IndexStmt consumer = generateForalls(consumerAssignment, consumerForallIndexVars);
+
+                    /// TODO[Genghan]: How to combine with "split" schedule?
+                    if (!ws.getConsumerOrder().empty()) {
+                      consumer = consumer.reorder(consumerIndexVars);
+                    }
 
                     IndexStmt producer = generateForalls(producerAssignment, producerForallIndexVars);
                     Where where(consumer, producer);
