@@ -701,7 +701,7 @@ std::string CodeGen::printWsFuncs(std::map<std::string, std::tuple<int, std::str
     for (int i=0; i<order; i++) {
       ret << "          accumulator[p1].crd["<< i <<"] = accumulator[p2].crd[" << i <<"];\n";
     }
-    ret << "            accumulator[p1].val = accumulator[p2].val;\n";
+    ret << "          accumulator[p1].val = accumulator[p2].val;\n";
     ret << "        } else {\n";
     ret << "          p1++;\n";
     ret << "        }\n";
@@ -712,7 +712,7 @@ std::string CodeGen::printWsFuncs(std::map<std::string, std::tuple<int, std::str
     ret << "    if (COO_size == 0) {\n";
     ret << "      for (int i=0; i<accumulator_size; i++) {\n";
     for (int j=0;j<order;j++) {
-      ret << "      COO"<<(j+1)<<"_crd[i] = accumulator[i].crd["<<j<<"];\n";
+      ret << "        COO"<<(j+1)<<"_crd[i] = accumulator[i].crd["<<j<<"];\n";
     }
     ret << "        COO_vals[i] = accumulator[i].val;\n";
     ret << "      }\n";
@@ -730,11 +730,11 @@ std::string CodeGen::printWsFuncs(std::map<std::string, std::tuple<int, std::str
     ret << "    "<<clsname<<" tmp_con;\n";
     ret << "    while(accumulator_pointer < accumulator_size && content_pointer < COO_size) {\n";
     for (int i=0; i<order; i++) {
-      ret << "    tmp_con.crd["<<i<<"] = COO"<<(i+1)<<"_crd[content_pointer];\n";
+      ret << "      tmp_con.crd["<<i<<"] = COO"<<(i+1)<<"_crd[content_pointer];\n";
     }
     ret << "      if ("<<cmpname<<"(&accumulator[accumulator_pointer], &tmp_con) == 0) {\n";
     for (int i=0; i<order; i++) {
-      ret << "          tmp_COO_crd["<<i<<"][target_pointer] = accumulator[accumulator_pointer].crd["<<i<<"];\n";
+      ret << "        tmp_COO_crd["<<i<<"][target_pointer] = accumulator[accumulator_pointer].crd["<<i<<"];\n";
     }
     ret << "        tmp_COO_vals[target_pointer] = accumulator[accumulator_pointer].val + COO_vals[content_pointer];\n";
     ret << "        accumulator_pointer ++;\n";
@@ -742,14 +742,14 @@ std::string CodeGen::printWsFuncs(std::map<std::string, std::tuple<int, std::str
     ret << "        target_pointer ++;\n";
     ret << "      } else if ("<<cmpname<<"(&accumulator[accumulator_pointer], &tmp_con) < 0) {\n";
     for (int i=0; i<order; i++) {
-      ret << "      tmp_COO_crd["<<i<<"][target_pointer] = accumulator[accumulator_pointer].crd["<<i<<"];\n";
+      ret << "        tmp_COO_crd["<<i<<"][target_pointer] = accumulator[accumulator_pointer].crd["<<i<<"];\n";
     }
     ret << "        tmp_COO_vals[target_pointer] = accumulator[accumulator_pointer].val;\n";
     ret << "        accumulator_pointer ++;\n";
     ret << "        target_pointer ++;\n";
     ret << "      } else {\n";
     for (int i=0; i<order; i++) {
-      ret << "      tmp_COO_crd["<<i<<"][target_pointer] = COO"<<(i+1)<<"_crd[content_pointer];\n";
+      ret << "        tmp_COO_crd["<<i<<"][target_pointer] = COO"<<(i+1)<<"_crd[content_pointer];\n";
     }
     ret << "        tmp_COO_vals[target_pointer] = COO_vals[content_pointer];\n";
     ret << "        content_pointer ++;\n";
@@ -758,7 +758,7 @@ std::string CodeGen::printWsFuncs(std::map<std::string, std::tuple<int, std::str
     ret << "    }\n";
     ret << "    while(accumulator_pointer<accumulator_size) {\n";
     for (int i=0; i<order; i++) {
-      ret << "    tmp_COO_crd["<<i<<"][target_pointer] = accumulator[accumulator_pointer].crd["<<i<<"];\n";
+      ret << "      tmp_COO_crd["<<i<<"][target_pointer] = accumulator[accumulator_pointer].crd["<<i<<"];\n";
     }
     ret << "      tmp_COO_vals[target_pointer] = accumulator[accumulator_pointer].val;\n";
     ret << "      accumulator_pointer ++;\n";
@@ -766,7 +766,7 @@ std::string CodeGen::printWsFuncs(std::map<std::string, std::tuple<int, std::str
     ret << "    }\n";
     ret << "    while(content_pointer<COO_size) {\n";
     for (int i=0; i<order; i++) {
-      ret << "    tmp_COO_crd["<<i<<"][target_pointer] = COO"<<(i+1)<<"_crd[content_pointer];\n";
+      ret << "      tmp_COO_crd["<<i<<"][target_pointer] = COO"<<(i+1)<<"_crd[content_pointer];\n";
     }
     ret << "      tmp_COO_vals[target_pointer] = COO_vals[content_pointer];\n";
     ret << "      content_pointer ++;\n";
@@ -774,12 +774,12 @@ std::string CodeGen::printWsFuncs(std::map<std::string, std::tuple<int, std::str
     ret << "    }\n";
     ret << "    for (int i = 0; i < target_pointer; i++) {\n";
     for (int j=0; j<order; j++) {
-      ret << "    COO"<<(j+1)<<"_crd[i] = tmp_COO_crd["<<j<<"][i];\n";
+      ret << "      COO"<<(j+1)<<"_crd[i] = tmp_COO_crd["<<j<<"][i];\n";
     }
     ret << "      COO_vals[i] = tmp_COO_vals[i];\n";
     ret << "    }\n";
     for (int i=0; i<order; i++) {
-      ret << "  free(tmp_COO_crd["<<i<<"]);\n";
+      ret << "    free(tmp_COO_crd["<<i<<"]);\n";
     }
     ret << "    free(tmp_COO_vals);\n";
     ret << "    return target_pointer;\n";

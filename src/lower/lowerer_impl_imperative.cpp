@@ -695,18 +695,7 @@ Stmt LowererImplImperative::lowerAssignment(Assignment assignment)
         Stmt TryInsert = ir::Assign::make(spAccSize[result],ir::Call::make
         ("TryInsert_coord", {spInsertFail[result], spAccArr[result],spAccSize[result],spAccCapacity[result]
         , spPoint[result], lower(assignment.getRhs())},Int32));
-        vector<Stmt> EnlargerInner;
-        EnlargerInner.push_back(ir::Assign::make(spAllCapacity[result],
-                                                 ir::Mul::make(spAllCapacity[result],ir::Literal::make(2))));
-        for (int i = 0; i < result.getOrder(); i++) {
-          EnlargerInner.push_back(ir::Allocate::make(spAllcrd[result][i],spAllCapacity[result],true,
-                                                     spAllcrd[result][i]));
-        }
-        EnlargerInner.push_back(ir::Allocate::make(spAllvals[result],spAllCapacity[result],true,spAllvals[result]));
-        Stmt Enlarger = ir::IfThenElse::make(Load::make(spInsertFail[result],ir::Literal::make(0)),
-                                             Block::make(
-         ir::IfThenElse::make(ir::Gt::make(ir::Add::make(spAccSize[result],spAllSize[result]),spAllCapacity[result]),
-            ir::Block::make(EnlargerInner))));
+
         std::vector<Expr> MergeParameters;
         for(int i = 0; i < result.getOrder(); i++) {
           MergeParameters.push_back(spAllcrd[result][i]);
@@ -715,7 +704,25 @@ Stmt LowererImplImperative::lowerAssignment(Assignment assignment)
                                                        spAccSize[result]});
         Stmt Merger = ir::Assign::make(spAllSize[result], ir::Call::make("Merge_coord", MergeParameters, Int32));
         Stmt Clear = ir::Assign::make(spAccSize[result], ir::Literal::make(0));
-        computeStmt = Block::make(TryInsert, Enlarger, Merger, Clear, TryInsert);
+
+        vector<Stmt> EnlargerInner;
+        EnlargerInner.push_back(ir::Assign::make(spAllCapacity[result],
+                                                 ir::Mul::make(spAllCapacity[result],ir::Literal::make(2))));
+        for (int i = 0; i < result.getOrder(); i++) {
+          EnlargerInner.push_back(ir::Allocate::make(spAllcrd[result][i],spAllCapacity[result],true,
+                                                     spAllcrd[result][i]));
+        }
+        EnlargerInner.push_back(ir::Allocate::make(spAllvals[result],spAllCapacity[result],true,spAllvals[result]));
+
+        Stmt Enlarger = ir::IfThenElse::make(Load::make(spInsertFail[result],ir::Literal::make(0)),
+                                             Block::make(
+         ir::IfThenElse::make(ir::Gt::make(ir::Add::make(spAccSize[result],spAllSize[result]),spAllCapacity[result]),
+            ir::Block::make(EnlargerInner)),
+            Merger,
+            Clear,
+            TryInsert));
+
+        computeStmt = Block::make(TryInsert, Enlarger);
         return computeStmt;
       }
     }
@@ -2690,7 +2697,7 @@ vector<Stmt> LowererImplImperative::codeToInitializeSpTemporary(Where where){
   Stmt initializeTemporary = Stmt();
 
 
-  Stmt accCapacityDecl = VarDecl::make(spAccCapacity[temporary], ir::Literal::make(1<<20));
+  Stmt accCapacityDecl = VarDecl::make(spAccCapacity[temporary], ir::Literal::make(temporary.getAccSize()));
   Stmt accSizeDecl = VarDecl::make(spAccSize[temporary], ir::Literal::make(0));
   Stmt accArrDecl = VarDecl::make(spAccArr[temporary], ir::Literal::make(0));
   Stmt allocAccArr = Allocate::make(spAccArr[temporary], spAccCapacity[temporary]);

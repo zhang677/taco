@@ -1168,8 +1168,8 @@ public:
   TensorVar(const int &id, const std::string& name, const Type& type, const Format& format,
             const Literal& fill = Literal());
 
-  TensorVar(const std::string& name, const Type& type, const SpFormat& format, const std::vector<int> ow_order = {}, const Literal& fill = Literal());
-  TensorVar(const int &id, const std::string& name, const Type& type, const SpFormat& format, const std::vector<int> ow_order = {},
+  TensorVar(const std::string& name, const Type& type, const SpFormat& format, const std::vector<int>& ow_order = {}, const int &accSize=1<<20, const Literal& fill = Literal());
+  TensorVar(const int &id, const std::string& name, const Type& type, const SpFormat& format, const std::vector<int>& ow_order = {}, const int &accSize=1<<20,
             const Literal& fill = Literal());
   /// Returns the ID of the tensor variable.
   int getId() const;
@@ -1204,6 +1204,9 @@ public:
 
   /// Gets the consumer topological order
   const std::vector<int>& getConsumerOrder() const;
+
+  /// Gets the accumulator size
+  int getAccSize() const;
 
   /// Set the acceleration dimensions
   void setAccelIndexVars(const std::vector<IndexVar>& accelIndexVars, bool shouldAccel);

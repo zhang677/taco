@@ -2551,6 +2551,7 @@ struct TensorVar::Content {
   bool shouldAccel;
   SpFormat spformat;
   std::vector<int> ow_order;
+  int accSize;
 };
 
 TensorVar::TensorVar() : content(nullptr) {
@@ -2576,8 +2577,8 @@ TensorVar::TensorVar(const string& name, const Type& type, const Format& format,
     : TensorVar(-1, name, type, format, fill) {
 }
 
-TensorVar::TensorVar(const std::string& name, const Type& type, const SpFormat& format, const std::vector<int> ow_order, const Literal& fill)
-    : TensorVar(-1, name, type, format, ow_order, fill) {
+TensorVar::TensorVar(const std::string& name, const Type& type, const SpFormat& format, const std::vector<int>& ow_order, const int &accSize, const Literal& fill)
+    : TensorVar(-1, name, type, format, ow_order, accSize, fill) {
 
 }
 
@@ -2594,7 +2595,7 @@ TensorVar::TensorVar(const int& id, const string& name, const Type& type, const 
   content->ow_order = {};
 }
 
-TensorVar::TensorVar(const int &id, const std::string& name, const Type& type, const SpFormat& format, const std::vector<int> ow_order, const Literal& fill)
+TensorVar::TensorVar(const int &id, const std::string& name, const Type& type, const SpFormat& format, const std::vector<int>& ow_order, const int &accSize, const Literal& fill)
     : content(new Content) {
   content->id = id;
   content->name = name;
@@ -2609,6 +2610,7 @@ TensorVar::TensorVar(const int &id, const std::string& name, const Type& type, c
   content->shouldAccel = true;
   content->spformat = format;
   content->ow_order = ow_order;
+  content->accSize = accSize;
 }
 
 int TensorVar::getId() const {
@@ -2666,6 +2668,10 @@ SpFormat::AccType TensorVar::getAccType() const {
 
 const std::vector<int>& TensorVar::getConsumerOrder() const {
   return content->ow_order;
+}
+
+int TensorVar::getAccSize() const {
+  return content->accSize;
 }
 
 void TensorVar::setAccelIndexVars(const std::vector<IndexVar>& accelIndexVars, bool shouldAccel) {

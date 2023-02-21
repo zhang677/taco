@@ -916,7 +916,7 @@ TEST(scheduling_eval, spWS_discordant) {
   B.pack();
 
   C(k, i) = A(i, j) * B(j, k);
-  TensorVar W("W", Type(Float32,{(size_t)NUM_I, (size_t)NUM_K}), wFormat, {1,0});
+  TensorVar W("w", Type(Float32,{(size_t)NUM_I, (size_t)NUM_K}), wFormat, {1,0}, 3);
   IndexExpr precomputedExpr = A(i, j) * B(j, k);
   C(k, i) = precomputedExpr;
 
