@@ -782,6 +782,7 @@ std::string CodeGen::printWsFuncs(std::map<std::string, std::tuple<int, std::str
       ret << "    free(tmp_COO_crd["<<i<<"]);\n";
     }
     ret << "    free(tmp_COO_vals);\n";
+    ret << "    printf(\"size: %d\",target_pointer);\n";
     ret << "    return target_pointer;\n";
     ret << "  }\n";
 

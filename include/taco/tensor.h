@@ -422,7 +422,7 @@ public:
   /// Compile the tensor expression.
   void compile();
 
-  void compile(IndexStmt stmt, bool assembleWhileCompute=false);
+  void compile(IndexStmt stmt, bool assembleWhileCompute=false, bool scalarPromote = true);
 
   void compile(IndexStmt stmt, std::map<TensorVar, IndexStmt> helperStmts,bool assembleWhileCompute=false);
 
