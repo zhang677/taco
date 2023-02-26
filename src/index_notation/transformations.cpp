@@ -718,12 +718,6 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
         }
     };
 
-    /// TODO:[Genghan] Rewrite the IndexStmt here?
-    /*
-    if(this->getWorkspace().getAccType()!=SpFormat::None) {
-      ;
-    }
-     */
     PrecomputeRewriter rewriter;
     rewriter.precompute = *this;
     rewriter.provGraph = provGraph;
@@ -734,11 +728,6 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
     stmt.accept(&findVisitor);
     RedundantRewriter ReRewriter(to_change);
     stmt = ReRewriter.rewrite(stmt);
-    /*
-    if(this->getWorkspace().getAccType()!=SpFormat::None) {
-      ;
-    }
-     */
     return stmt;
 }
 
