@@ -598,14 +598,14 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
                     }
                     IndexStmt consumer = generateForalls(consumerAssignment, consumerForallIndexVars);
 
-                    IndexExpr newExpr;
-                    FormatVisitor fmtVisitor(newExpr, ws);
-                    FormatRewriter fmtRewriter(newExpr);
-                    fmtVisitor.visit(consumer);
-                    fmtRewriter.visit(consumer);
                     /// TODO[Genghan]: How to combine with "split" schedule?
                     if (ws.getAccType()!=SpFormat::None) {
                       cout<< "Reorder for consumer" << endl;
+                      IndexExpr newExpr;
+                      FormatVisitor fmtVisitor(newExpr, ws);
+                      FormatRewriter fmtRewriter(newExpr);
+                      fmtVisitor.visit(consumer);
+                      fmtRewriter.visit(consumer);
                       consumer = consumer.reorder(consumerIndexVars);
                     }
 
