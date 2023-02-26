@@ -881,8 +881,8 @@ TEST(scheduling_eval, spWS_concordant) {
 
 TEST(scheduling_eval, spWS_discordant) {
   int NUM_I = 50;
-  int NUM_J = 50;
-  int NUM_K = 50;
+  int NUM_J = 100;
+  int NUM_K = 150;
   float SPARSITY = .2;
   // Format aFormat = COO(2,true,true,false,{0,1}); // order, isUnique, isOrdered, isAoS(array-of-struct), modeOrdering
   Format aFormat = CSR;
@@ -937,7 +937,6 @@ TEST(scheduling_eval, spWS_discordant_TTV) {
   int NUM_I = 50;
   int NUM_J = 50;
   int NUM_K = 50;
-  int NUM_L = 50;
   float SPARSITY = .2;
   // Format aFormat = COO(2,true,true,false,{0,1}); // order, isUnique, isOrdered, isAoS(array-of-struct), modeOrdering
   Format aFormat = CSR;

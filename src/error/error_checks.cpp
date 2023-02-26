@@ -44,6 +44,7 @@ std::pair<bool, string> dimensionsTypecheck(const std::vector<IndexVar>& resultV
     if (util::contains(indexVarDims,var) && indexVarDims.at(var) != dimension &&
         !(indexVarDims.at(var).isIndexVarSized() && indexVarDims.at(var).getIndexVarSize() == var) &&
         !(dimension.isIndexVarSized() && dimension.getIndexVarSize() == var)) {
+
       errors.push_back(addDimensionError(var, indexVarDims.at(var), dimension));
     } else {
       indexVarDims.insert({var, dimension});

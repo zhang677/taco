@@ -1223,6 +1223,9 @@ public:
   /// Exchange format and spformat
   void exchangeFormat();
 
+  /// Exchange type and optype
+  void exchangeType();
+
   /// Create an index expression that accesses (reads) this tensor.
   const Access operator()(const std::vector<IndexVar>& indices) const;
 

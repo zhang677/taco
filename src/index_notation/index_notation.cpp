@@ -2551,6 +2551,7 @@ struct TensorVar::Content {
   bool shouldAccel;
   SpFormat spformat;
   std::vector<int> ow_order;
+  Type ow_type;
   int accSize;
 };
 
@@ -2593,6 +2594,7 @@ TensorVar::TensorVar(const int& id, const string& name, const Type& type, const 
   content->shouldAccel = true;
   content->spformat = SpFormat(format,SpFormat::None);
   content->ow_order = {};
+  content->ow_type = type;
 }
 
 TensorVar::TensorVar(const int &id, const std::string& name, const Type& type, const SpFormat& format, const std::vector<int>& ow_order, const int &accSize, const Literal& fill)
@@ -2610,6 +2612,11 @@ TensorVar::TensorVar(const int &id, const std::string& name, const Type& type, c
   content->shouldAccel = true;
   content->spformat = format;
   content->ow_order = ow_order;
+  std::vector<Dimension> dims;
+  for (auto& i : ow_order) {
+    dims.push_back(type.getShape().getDimension(i));
+  }
+  content->ow_type = Type(type.getDataType(), Shape(dims));
   content->accSize = accSize;
 }
 
@@ -2695,6 +2702,12 @@ void TensorVar::exchangeFormat() {
   SpFormat temp = content->spformat;
   content->spformat = SpFormat(content->format, temp.getAccType());
   content->format = temp;
+}
+
+void TensorVar::exchangeType(){
+  Type temp = content->type;
+  content->type = content->ow_type;
+  content->ow_type = temp;
 }
 
 const Access TensorVar::operator()(const std::vector<IndexVar>& indices) const {
@@ -3004,6 +3017,7 @@ bool isConcreteNotation(IndexStmt stmt, std::string* reason) {
         isConcrete = false;
         return;
       }
+
 
       // Handles derived vars on RHS with underived vars on LHS.
       Assignment assignPtrWrapper = Assignment(op);

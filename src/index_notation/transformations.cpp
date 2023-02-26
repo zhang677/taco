@@ -408,6 +408,33 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
     ProvenanceGraph provGraph = ProvenanceGraph(stmt);
 
 
+    struct FormatVisitor: public IndexNotationVisitor {
+      using IndexNotationVisitor::visit;
+      IndexExpr& newExpr;
+      TensorVar ws;
+      FormatVisitor(IndexExpr& newExpr, TensorVar ws): newExpr(newExpr), ws(ws) {}
+
+      void visit(const AccessNode* node) {
+        if (node->tensorVar.getName() == ws.getName()) {
+          TensorVar tensor = node->tensorVar;
+          tensor.exchangeType();
+          newExpr = Access(tensor, node->indexVars, node->packageModifiers(),node->isAccessingStructure);
+        }
+      }
+    };
+
+    struct FormatRewriter: public IndexNotationRewriter {
+      using IndexNotationRewriter::visit;
+      IndexExpr newExpr;
+      FormatRewriter(IndexExpr& newExpr): newExpr(newExpr) {}
+      void visit(const AssignmentNode* node) {
+        Assignment a(node->lhs, node->rhs, node->op);
+        stmt = Assignment(a.getLhs(), newExpr, a.getOperator());
+        IndexNotationRewriter::visit(node);
+      }
+    };
+
+
 
     struct PrecomputeRewriter : public IndexNotationRewriter {
         using IndexNotationRewriter::visit;
@@ -431,7 +458,7 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
                       }
                   })
             );
-
+            cout<<"Consumer: "<<stmt<<endl;
             IndexSetRel rel = a.getIndexSetRel();
             /// The reduceOp depends on the relation between indexVar sets of rhs and lhs. For rcl and inter, reduceOp
             /// must be +=. For lcr, reduceOp must be =. For none and equal, reduceOp can't be decided at this stage.
@@ -526,7 +553,7 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
 
                 // Build consumer by replacing with temporary (in replacedStmt)
                 IndexStmt replacedStmt;
-                if (ws.getConsumerOrder().empty()) {
+                if (ws.getAccType()==SpFormat::None) {
                     replacedStmt = replace(s, {{e, ws(i_vars) }});
                 } else {
                     std::vector<IndexVar> o_vars;
@@ -537,13 +564,12 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
                 }
 
                 cout<<"ReplacedStmt: "<<replacedStmt<<endl;
+                cout<<"OriginalStmt: "<<s<<endl;
                 if (replacedStmt != s) {
                     // Then modify the replacedStmt to have the correct foralls
                     // by concretizing the consumer assignment
-
                     auto consumerAssignment = getConsumerAssignment(replacedStmt, ws);
                     auto consumerIndexVars = consumerAssignment.getIndexVars();
-
                     auto producerAssignment = getProducerAssignment(ws, i_vars, iw_vars, e, substitutions);
                     auto producerIndexVars = producerAssignment.getIndexVars();
 
@@ -572,8 +598,14 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
                     }
                     IndexStmt consumer = generateForalls(consumerAssignment, consumerForallIndexVars);
 
+                    IndexExpr newExpr;
+                    FormatVisitor fmtVisitor(newExpr, ws);
+                    FormatRewriter fmtRewriter(newExpr);
+                    fmtVisitor.visit(consumer);
+                    fmtRewriter.visit(consumer);
                     /// TODO[Genghan]: How to combine with "split" schedule?
-                    if (!ws.getConsumerOrder().empty()) {
+                    if (ws.getAccType()!=SpFormat::None) {
+                      cout<< "Reorder for consumer" << endl;
                       consumer = consumer.reorder(consumerIndexVars);
                     }
 
@@ -684,10 +716,14 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
             }
             IndexNotationRewriter::visit(node);
         }
-
-
     };
 
+    /// TODO:[Genghan] Rewrite the IndexStmt here?
+    /*
+    if(this->getWorkspace().getAccType()!=SpFormat::None) {
+      ;
+    }
+     */
     PrecomputeRewriter rewriter;
     rewriter.precompute = *this;
     rewriter.provGraph = provGraph;
@@ -698,6 +734,11 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
     stmt.accept(&findVisitor);
     RedundantRewriter ReRewriter(to_change);
     stmt = ReRewriter.rewrite(stmt);
+    /*
+    if(this->getWorkspace().getAccType()!=SpFormat::None) {
+      ;
+    }
+     */
     return stmt;
 }
 
