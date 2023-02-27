@@ -90,7 +90,6 @@ public:
   static ModeFormat dense;       /// e.g., first mode in CSR
   static ModeFormat compressed;  /// e.g., second mode in CSR
   static ModeFormat singleton;   /// e.g., second mode in COO
-  static ModeFormat SpCoord;
 
   static ModeFormat sparse;      /// alias for compressed
   static ModeFormat Dense;       /// alias for dense
@@ -171,7 +170,6 @@ private:
 
 class ModeFormatPack {
 public:
-  ModeFormatPack();
   ModeFormatPack(const std::vector<ModeFormat> modeFormats);
   ModeFormatPack(const std::initializer_list<ModeFormat> modeFormats);
   ModeFormatPack(const ModeFormat modeFormat);
@@ -195,6 +193,7 @@ public:
     None, Coord, Hash
   };
   SpFormat();
+  SpFormat(int mode, AccType accType);
   SpFormat(const Format& format, AccType accType);
   SpFormat(const std::vector<ModeFormatPack>& modeFormatPacks, AccType accType);
   SpFormat(const std::vector<ModeFormatPack>& modeFormatPacks, const std::vector<int>& modeOrdering, AccType accType);

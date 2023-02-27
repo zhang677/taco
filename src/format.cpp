@@ -336,9 +336,6 @@ std::ostream& operator<<(std::ostream& os, const ModeFormat& modeFormat) {
 
 
 // class ModeTypePack
-ModeFormatPack::ModeFormatPack() {
-}
-
 ModeFormatPack::ModeFormatPack(const std::vector<ModeFormat> modeFormats)
     : modeFormats(modeFormats) {
   for (const auto& modeFormat : modeFormats) {
@@ -461,7 +458,9 @@ SpFormat::SpFormat(const std::vector<ModeFormatPack> &modeFormatPacks, const std
   ;
 }
 SpFormat::AccType SpFormat::getAccType() const { return this->acc;}
-
+SpFormat::SpFormat(int mode, AccType accType): Format(COO(mode,true,true,false)), acc(accType) {
+  ;
+}
 
 
 }

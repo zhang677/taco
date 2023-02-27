@@ -879,7 +879,7 @@ TEST(scheduling_eval, spWS_concordant) {
 }
 
 
-TEST(scheduling_eval, spWS_discordant) {
+TEST(scheduling_eval, spWS_discordant_SpGEMM) {
   int NUM_I = 50;
   int NUM_J = 100;
   int NUM_K = 150;
@@ -888,7 +888,8 @@ TEST(scheduling_eval, spWS_discordant) {
   Format aFormat = CSR;
   Format bFormat = CSR;
   Format cFormat = CSR;
-  SpFormat wFormat = SpFormat(COO(2,true,true,false,{0,1}), SpFormat::Coord);
+  //SpFormat wFormat = SpFormat(COO(2,true,true,false,{0,1}), SpFormat::Coord);
+  SpFormat wFormat = SpFormat(2, SpFormat::Coord);
   Tensor<float> A("A",{NUM_I, NUM_J},aFormat);
   Tensor<float> B("B",{NUM_J, NUM_K},bFormat);
   Tensor<float> C("C",{NUM_K, NUM_I},cFormat);
@@ -939,11 +940,10 @@ TEST(scheduling_eval, spWS_discordant_TTV) {
   int NUM_J = 100;
   int NUM_K = 150;
   float SPARSITY = .2;
-  // Format aFormat = COO(2,true,true,false,{0,1}); // order, isUnique, isOrdered, isAoS(array-of-struct), modeOrdering
   Format aFormat = CSR;
   Format bFormat = {Sparse, Sparse, Sparse};
   Format cFormat = Format({Dense});
-  SpFormat wFormat = SpFormat(COO(2,true,true,false,{0,1}), SpFormat::Coord);
+  SpFormat wFormat = SpFormat(2, SpFormat::Coord);
   Tensor<float> A("A",{NUM_J, NUM_I},aFormat);
   Tensor<float> B("B",{NUM_I, NUM_J, NUM_K},bFormat);
   Tensor<float> c("c",{NUM_K},cFormat);
@@ -994,11 +994,10 @@ TEST(scheduling_eval, spWS_discordant_TTM) {
   int NUM_K = 15;
   int NUM_L = 20;
   float SPARSITY = .2;
-  // Format aFormat = COO(2,true,true,false,{0,1}); // order, isUnique, isOrdered, isAoS(array-of-struct), modeOrdering
   Format aFormat = {Dense, Dense, Dense};
   Format bFormat = {Sparse, Sparse, Sparse};
   Format cFormat = {Dense, Dense};
-  SpFormat wFormat = SpFormat(COO(3,true,true,false), SpFormat::Coord);
+  SpFormat wFormat = SpFormat(3, SpFormat::Coord);
   Tensor<float> A("A",{NUM_L, NUM_J, NUM_I},aFormat);
   Tensor<float> B("B",{NUM_I, NUM_J, NUM_K},bFormat);
   Tensor<float> C("C",{NUM_K, NUM_L},cFormat);
@@ -1051,12 +1050,11 @@ TEST(scheduling_eval, spWS_discordant_MTTKRP) {
   int NUM_K = 15;
   int NUM_L = 20;
   float SPARSITY = .2;
-  // Format aFormat = COO(2,true,true,false,{0,1}); // order, isUnique, isOrdered, isAoS(array-of-struct), modeOrdering
   Format aFormat = {Dense, Dense};
   Format bFormat = {Dense, Sparse, Sparse};
   Format cFormat = {Dense, Dense};
   Format dFormat = {Dense, Dense};
-  SpFormat wFormat = SpFormat(COO(2,true,true,false,{0,1}), SpFormat::Coord);
+  SpFormat wFormat = SpFormat(2, SpFormat::Coord);
   Tensor<float> A("A",{NUM_J, NUM_I},aFormat);
   Tensor<float> B("B",{NUM_I, NUM_K, NUM_L},bFormat);
   Tensor<float> C("C",{NUM_K, NUM_J},cFormat);

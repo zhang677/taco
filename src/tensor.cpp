@@ -773,7 +773,7 @@ void TensorBase::syncDependentTensors() {
 }
 
 void TensorBase::userSetNeedsValueSize(bool needsValueSize) {
-  content->needsValueSize = false;
+  content->needsValueSize = needsValueSize;
 }
 
 static inline map<TensorVar, TensorBase> getTensors(const IndexExpr& expr) {

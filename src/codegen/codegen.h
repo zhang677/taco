@@ -75,8 +75,6 @@ private:
 };
 
 
-void setCHeader(std::string newStr);
-
 } // namespace ir
 } // namespace taco
 #endif

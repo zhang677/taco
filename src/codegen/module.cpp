@@ -100,7 +100,6 @@ void writeShims(vector<Stmt> funcs, string path, string prefix) {
     shims_file.open(path+prefix+"_shims.cpp");
   }
   else {
-    //shims_file.open(path+prefix+".c", ios::app);
     shims_file.open(path+prefix+".c", ios::app);
   }
   shims_file << "#include \"" << path << prefix << ".h\"\n";
@@ -145,7 +144,7 @@ string Module::compile() {
   }
   
   string cmd = cc + " " + cflags + " " +
-    prefix + file_ending + " " + shims_file + " " + " "
+    prefix + file_ending + " " + shims_file + " " +
     "-o " + fullpath + " -lm";
 
   // open the output file & write out the source

@@ -151,14 +151,14 @@ ModeFormatImpl::ModeFormatImpl(const std::string name, bool isFull,
                                bool hasCoordValIter, bool hasCoordPosIter, 
                                bool hasLocate, bool hasInsert, bool hasAppend, 
                                bool hasSeqInsertEdge, bool hasInsertCoord,
-                               bool isYieldPosPure, bool isSpWorkspace) :
+                               bool isYieldPosPure) :
     name(name), isFull(isFull), isOrdered(isOrdered), isUnique(isUnique),
     isBranchless(isBranchless), isCompact(isCompact), isZeroless(isZeroless),
     isPadded(isPadded), hasCoordValIter(hasCoordValIter),
     hasCoordPosIter(hasCoordPosIter), hasLocate(hasLocate),
     hasInsert(hasInsert), hasAppend(hasAppend), 
     hasSeqInsertEdge(hasSeqInsertEdge), hasInsertCoord(hasInsertCoord),
-    isYieldPosPure(isYieldPosPure), isSpWorkspace(isSpWorkspace) {
+    isYieldPosPure(isYieldPosPure){
 }
 
 ModeFormatImpl::~ModeFormatImpl() {

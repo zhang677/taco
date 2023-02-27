@@ -392,6 +392,12 @@ private:
     }
     std::cout<<std::endl;
     for (auto accessVar : underivedAncestorsSet) {
+      /*
+      if (lhsUnderivedAncestors.count(accessVar)) {
+        resultIterators.insert(getIterator(lhs, accessVar));
+      }
+       */
+
       if (lhsUnderivedAncestors.find(accessVar)!=lhsUnderivedAncestors.end()) {
         std::cout<<accessVar<<std::endl;
         resultIterators.insert(getIterator(lhs, accessVar)); // Bug location!

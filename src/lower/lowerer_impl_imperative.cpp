@@ -2244,7 +2244,11 @@ Stmt LowererImplImperative::lowerForallBody(Expr coordinate, IndexStmt stmt,
                                   MergeLattice caseLattice,
                                   const set<Access>& reducedAccesses, 
                                   MergeStrategy mergeStrategy) {
-
+  cout << "Inserters: " <<endl;
+  for (auto& i : inserters) {
+    cout << i << ",";
+  }
+  cout << endl;
   // Inserter positions
   Stmt declInserterPosVars = declLocatePosVars(inserters);
 
@@ -2303,6 +2307,8 @@ Stmt LowererImplImperative::lowerForallBody(Expr coordinate, IndexStmt stmt,
   }
 
   Stmt incr = Block::make(stmts);
+
+  cout << "declInserterPosVars: " << declInserterPosVars;
 
   return Block::make(initVals,
                      declInserterPosVars,

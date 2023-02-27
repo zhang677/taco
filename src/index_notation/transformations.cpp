@@ -607,6 +607,8 @@ IndexStmt Precompute::apply(IndexStmt stmt, std::string* reason) const {
                       fmtVisitor.visit(consumer);
                       fmtRewriter.visit(consumer);
                       consumer = consumer.reorder(consumerIndexVars);
+                      fmtVisitor.visit(consumer);
+                      fmtRewriter.visit(consumer);
                     }
 
                     IndexStmt producer = generateForalls(producerAssignment, producerForallIndexVars);

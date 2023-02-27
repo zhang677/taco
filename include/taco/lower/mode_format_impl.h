@@ -109,7 +109,7 @@ public:
 		 bool isPadded, bool hasCoordValIter, bool hasCoordPosIter, 
 		 bool hasLocate, bool hasInsert, bool hasAppend, 
 		 bool hasSeqInsertEdge, bool hasInsertCoord, 
-		 bool isYieldPosPure, bool isSpWorkspace = false);
+		 bool isYieldPosPure);
 
   virtual ~ModeFormatImpl();
 
@@ -258,7 +258,6 @@ public:
   const bool hasInsertCoord;
   const bool isYieldPosPure;
 
-  const bool isSpWorkspace;
 
 protected:
   /// Check if other mode format is identical. Can assume that this method will 

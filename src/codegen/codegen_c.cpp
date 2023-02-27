@@ -163,12 +163,9 @@ const string cHeaders =
   "}\n"
   "#endif\n";
 
-string nHeaders = "";
 } // anonymous namespace
 
-void setCHeader(string newStr) {
-  nHeaders = newStr;
-}
+
 
 // find variables for generating declarations
 // generates a single var for each GetProperty
@@ -338,6 +335,7 @@ void CodeGen_C::visit(const Function* func) {
   resetUniqueNameCounters();
   std::vector<Expr> allInputs = func->inputs;
   if(!(func->sparseWS).empty()) {
+    this->simplify = false;
     allInputs.insert(allInputs.end(), (func->sparseWS).begin(), (func->sparseWS).end());
   }
   FindVars varFinder(allInputs, func->outputs, this);
