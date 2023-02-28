@@ -720,11 +720,8 @@ TEST(scheduling_eval, spFormat) {
   }
   B.pack();
   C(k, i) = W(k, i) + B(k, i);
-  //IndexStmt packStmt = generatePackStmt(C(i,k).getTensorVar(), "W", WFormat, C(i,k).getIndexVars(), true);
-  //IndexStmt packStmt = generatePackCOOStmt(C(i,k).getTensorVar(), C(i,k).getIndexVars(), true);
   IndexStmt stmt = C.getAssignment().concretize();
   C.compile(stmt);
-  //C.compile(packStmt, true);
   C.assemble();
   C.compute();
   cout<<C<<endl;
@@ -783,101 +780,6 @@ TEST(scheduling_eval, spTriWS) {
 
   ASSERT_EQ(1,1);
 }
-
-TEST(scheduling_eval, spWS_concordant) {
-  int NUM_I = 50;
-  int NUM_J = 50;
-  int NUM_K = 50;
-  float SPARSITY = .2;
-  // Format aFormat = COO(2,true,true,false,{0,1}); // order, isUnique, isOrdered, isAoS(array-of-struct), modeOrdering
-  Format aFormat = CSR;
-  Format bFormat = CSR;
-  Format cFormat = CSR;
-  //Format cFormat = COO(2,true,true,false,{0,1});
-  //Format wFormat = COO(2,true,true,false,{0,1});//{Dense, Dense};//COO(2,true,true,false,{0,1});// COO(2,false,false,false,{0,1});
-  SpFormat wFormat = SpFormat(COO(2,true,true,false,{0,1}), SpFormat::Coord);
-  //SpFormat wFormat = SpFormat(Format({Dense,Dense}), SpFormat::Coord);
-  //Format wFormat = {Dense, Dense};
-  Tensor<float> A("A",{NUM_I, NUM_J},aFormat);
-  Tensor<float> B("B",{NUM_J, NUM_K},bFormat);
-  Tensor<float> C("C",{NUM_I, NUM_K},cFormat);
-  //Tensor<float> C("C",{NUM_K, NUM_I},cFormat);
-  C.userSetNeedsValueSize(false);
-  srand(75883);
-  for (int i = 0; i < NUM_I; i++) {
-    for (int j = 0; j < NUM_J; j++) {
-      float rand_float = (float)rand()/(float)(RAND_MAX);
-      if (rand_float < SPARSITY) {
-        A.insert({i, j}, (float) ((int) (rand_float*3/SPARSITY)));
-      }
-    }
-  }
-
-  for (int j = 0; j < NUM_J; j++) {
-    for (int k = 0; k < NUM_K; k++) {
-      float rand_float = (float)rand()/(float)(RAND_MAX);
-      if (rand_float < SPARSITY) {
-        B.insert({j, k}, (float) ((int) (rand_float*3/SPARSITY)));
-      }
-    }
-  }
-
-  A.pack();
-  B.pack();
-
-  C(i, k) = A(i, j) * B(j, k);
-  //C(k, i) = A(i, j) * B(j, k);
-  //TensorVar W("W", Type(Float32,{(size_t)NUM_I, (size_t)NUM_K}), {Dense, Dense});
-  //TensorVar W("W", Type(Float32,{(size_t)NUM_I, (size_t)NUM_K}), aFormat);
-  TensorVar W("W", Type(Float32,{(size_t)NUM_I, (size_t)NUM_K}), wFormat);
-  IndexExpr precomputedExpr = A(i, j) * B(j, k);
-  C(i, k) = precomputedExpr;
-  //C(k, i) = precomputedExpr;
-  IndexStmt stmt = C.getAssignment().concretize();
-  Assignment assign = stmt.as<Forall>().getStmt().as<Forall>().getStmt()
-    .as<Forall>().getStmt().as<Assignment>();
-  TensorVar result = assign.getLhs().getTensorVar();
-  std::cout<<"*****"<<stmt<<std::endl;
-  std::cout<<"wFormat: "<<wFormat<<std::endl;
-  //std::cout<<"result: "<<result<<std::endl;
-  //IndexStmt packStmt = generatePackCOOStmt(C(i,k).getTensorVar(), C(i,k).getIndexVars(), true);
-  //std::cout<<"packStmt: "<<packStmt<<std::endl;
-  //IndexVar iw("qi"), kw("qk");
-  stmt = stmt.reorder({i,j,k});
-  //stmt = reorderLoopsTopologically(stmt);
-  //stmt = stmt.reorder({j,i,k});
-  //stmt = stmt.assemble(C(i,k).getTensorVar(), AssembleStrategy::Insert, true);
-  //stmt = stmt.precompute(precomputedExpr, {i,k}, {iw,kw}, W);
-  stmt = stmt.precompute(precomputedExpr, {i,k}, {i,k}, W);
-  cout<<"stmt: "<<stmt<<endl;
-  IndexStmt packStmt = generateSpPackStmt(C(i,k).getTensorVar(), "W", wFormat, C(i,k).getIndexVars(), true);
-  //IndexStmt packStmt = generateSpPackStmt(C(k,i).getTensorVar(), "W", wFormat, C(k,i).getIndexVars(), true);
-  cout<<"packStmt: "<<endl;
-  cout<<packStmt<<endl;
-  std::map<TensorVar, IndexStmt> helperStmts;
-
-  helperStmts.insert({W, packStmt});
-  C.compile(stmt, helperStmts);
-  cout<<"Running assemble"<<endl;
-  C.assemble();
-  cout<<"Running compute"<<endl;
-  C.compute();
-  cout<<"Running compute over!"<<endl;
-  cout<<C<<endl;
-
-  Tensor<float> expected("expected", {NUM_I, NUM_K}, {Dense, Dense});
-  expected(i, k) = A(i, j) * B(j, k);
-  stmt = expected.getAssignment().concretize();
-  //stmt = expected.getAssignment().concretize();
-  //stmt = scheduleSpGEMMCPU(stmt,false);
-  expected.compile();
-  expected.assemble();
-  expected.compute();
-  cout<<"Expected over!"<<endl;
-  ASSERT_TENSOR_EQ(expected, C);
-  //ASSERT_EQ(1,1);
-}
-
 
 TEST(scheduling_eval, spWS_discordant_SpGEMM) {
   int NUM_I = 50;

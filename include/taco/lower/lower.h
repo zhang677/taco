@@ -50,10 +50,6 @@ ir::Stmt lower(IndexStmt stmt, std::string functionName,
                bool assemble=true, bool compute=true, bool pack=false, bool unpack=false,
                Lowerer lowerer=Lowerer());
 
-ir::Stmt lower(IndexStmt stmt, std::map<TensorVar,IndexStmt> helperStmts,std::string functionName,
-               bool assemble=true, bool compute=true, bool pack=false, bool unpack=false,
-               Lowerer lowerer=Lowerer());
-
 /// Check whether the an index statement can be lowered to C code.  If the
 /// statement cannot be lowered and a `reason` string is provided then it is
 /// filled with the a reason.

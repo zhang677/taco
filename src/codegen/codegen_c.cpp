@@ -162,10 +162,7 @@ const string cHeaders =
   "  free(t);\n"
   "}\n"
   "#endif\n";
-
 } // anonymous namespace
-
-
 
 // find variables for generating declarations
 // generates a single var for each GetProperty
@@ -319,7 +316,9 @@ void CodeGen_C::visit(const Function* func) {
   func->body.accept(&outputVarFinder);
   // output function declaration
   doIndent();
+
   out << printFuncName(func, inputVarFinder.varDecls, outputVarFinder.varDecls);
+
   // if we're just generating a header, this is all we need to do
   if (outputKind == HeaderGen) {
     out << ";\n";

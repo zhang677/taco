@@ -337,9 +337,6 @@ public:
   // comparison of the access rather than a pointer check.
   friend bool operator==(const Access& a, const Access& b);
   friend bool operator<(const Access& a, const Access &b);
-
-  /// Exchange the format of TensorVar
-  void exchangeFormat();
 };
 
 
@@ -1345,6 +1342,7 @@ std::pair<std::vector<Access>,std::set<Access>> getResultAccesses(IndexStmt stmt
 /// Returns the input accesses, in the order they appear.
 std::vector<Access> getArgumentAccesses(IndexStmt stmt);
 
+/// Returns the access to workspace, in the order they appear.
 std::vector<Access> getTemporaryAccesses(IndexStmt stmt);
 
 /// Returns the index variables in the index statement.
@@ -1392,9 +1390,6 @@ IndexStmt generatePackStmt(TensorVar tensor,
 /// Same as generatePackStmt, where otherFormat is COO.
 IndexStmt generatePackCOOStmt(TensorVar tensor, 
                               std::vector<IndexVar> indexVars, bool otherIsOnRight);
-
-IndexStmt generateSpPackStmt(TensorVar tensor, std::string otherName, SpFormat otherFormat,
-                             std::vector<IndexVar> indexVars, bool otherIsOnRight);
 
 }
 #endif

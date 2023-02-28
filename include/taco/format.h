@@ -220,7 +220,6 @@ extern const Format CSC;
 extern const Format DCSR;
 extern const Format DCSC;
 
-
 const Format COO(int order, bool isUnique = true, bool isOrdered = true, 
                  bool isAoS = false, const std::vector<int>& modeOrdering = {});
 /// @}

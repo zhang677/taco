@@ -548,13 +548,6 @@ LowererImplImperative::lower(IndexStmt stmt, string name,
 }
 
 
-Stmt
-LowererImplImperative::lower(IndexStmt stmt, std::map<TensorVar, IndexStmt> helperStmts, string name,
-                             bool assemble, bool compute, bool pack, bool unpack){
-  this->helperStmts = helperStmts;
-  return lower(stmt, name, assemble, compute, pack, unpack);
-}
-
 Stmt LowererImplImperative::lowerAssignment(Assignment assignment)
 {
   taco_iassert(generateAssembleCode() || generateComputeCode());
@@ -3564,6 +3557,7 @@ ir::Stmt LowererImplImperative::finalizeResultArrays(std::vector<Access> writes)
       // Post-process data structures for storing levels
       if (iterator.hasAppend()) {
         size = iterator.getPosVar();
+        cout << "Finalize size: " << size << endl;
         finalize = iterator.getAppendFinalizeLevel(parentSize, size);
       } else if (iterator.hasInsert()) {
         size = simplify(ir::Mul::make(parentSize, iterator.getWidth()));

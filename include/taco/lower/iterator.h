@@ -279,14 +279,12 @@ public:
 
   std::map<IndexVar, Iterator> modeIterators() const;
 
-
 private:
   void createAccessIterators(Access access, Format format, ir::Expr tensorIR, ProvenanceGraph provGraph,
                              const std::map<TensorVar, ir::Expr> &tensorVars);
 
   struct Content;
   std::shared_ptr<Content> content;
-
 };
 
 /// Filter out and return the iterators with the append capability.

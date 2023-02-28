@@ -63,16 +63,6 @@ ir::Stmt lower(IndexStmt stmt, std::string name,
   return lowered;
 }
 
-ir::Stmt lower(IndexStmt stmt, std::map<TensorVar,IndexStmt> helperStmts, std::string name, bool assemble, bool compute,
-               bool pack, bool unpack, Lowerer lowerer) {
-  string reason;
-  taco_iassert(isLowerable(stmt, &reason))
-    << "Not lowerable, because " << reason << ": " << stmt;
-
-  ir::Stmt lowered = lowerer.getLowererImpl()->lower(stmt, helperStmts, name, assemble, compute, pack, unpack);
-  return lowered;
-}
-
 
 bool isLowerable(IndexStmt stmt, std::string* reason) {
   INIT_REASON(reason);

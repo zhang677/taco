@@ -258,7 +258,6 @@ public:
   const bool hasInsertCoord;
   const bool isYieldPosPure;
 
-
 protected:
   /// Check if other mode format is identical. Can assume that this method will 
   /// always be called with an argument that is of the same class.

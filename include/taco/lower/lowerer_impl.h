@@ -57,8 +57,6 @@ public:
   /// Lower an index statement to an IR function.
   virtual ir::Stmt lower(IndexStmt stmt, std::string name, 
                  bool assemble, bool compute, bool pack, bool unpack) = 0;
-  virtual ir::Stmt lower(IndexStmt stmt, std::map<TensorVar, IndexStmt> helperStmts,std::string name,
-                         bool assemble, bool compute, bool pack, bool unpack) = 0;
 
 protected:
 

@@ -58,9 +58,6 @@ public:
   ir::Stmt lower(IndexStmt stmt, std::string name, 
                  bool assemble, bool compute, bool pack, bool unpack);
 
-  ir::Stmt lower(IndexStmt stmt, std::map<TensorVar, IndexStmt> helperStmts, std::string name,
-                 bool assemble, bool compute, bool pack, bool unpack);
-
 protected:
 
   /// Lower an assignment statement.

@@ -6,7 +6,6 @@
 #include "taco/ir/ir.h"
 #include "taco/ir/ir_printer.h"
 
-
 namespace taco {
 namespace ir {
 
@@ -73,6 +72,8 @@ private:
                             int mode, int index);
   std::string pointTensorProperty(std::string varname);
 };
+
+
 
 
 } // namespace ir
