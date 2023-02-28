@@ -1026,7 +1026,8 @@ TEST_P(spgemm, scheduling_eval) {
   int NUM_J = 100;
   int NUM_K = 100;
   float SPARSITY = .03;
-  Format cFormat = COO(2,true,true,false,{0,1});
+  //Format cFormat = COO(2,true,true,false,{0,1});
+  Format cFormat = CSR;
   Tensor<float> A("A", {NUM_I, NUM_J}, aFormat);
   Tensor<float> B("B", {NUM_J, NUM_K}, bFormat);
   Tensor<float> C("C", {NUM_I, NUM_K}, cFormat);
@@ -1055,9 +1056,8 @@ TEST_P(spgemm, scheduling_eval) {
 
   C(i, k) = A(i, j) * B(j, k);
   IndexStmt stmt = C.getAssignment().concretize();
-  cout<<"*****"<<endl;
-  //stmt = scheduleSpGEMMCPU(stmt, doPrecompute);
-  stmt = scheduleSpGEMMCPUNotParallel(stmt, doPrecompute);
+  stmt = scheduleSpGEMMCPU(stmt, doPrecompute);
+  //stmt = scheduleSpGEMMCPUNotParallel(stmt, doPrecompute);
 
   C.compile(stmt);
   //C.setAssembleWhileCompute(true);

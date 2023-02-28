@@ -3540,7 +3540,7 @@ ir::Stmt LowererImplImperative::finalizeResultArrays(std::vector<Access> writes)
   bool clearValuesAllocation = false;
   std::vector<Stmt> result;
   for (auto& write : writes) {
-    if(!spTemporaryVars.empty()) {
+    if(spTemporaryVars.empty()) {
       if (write.getTensorVar().getOrder() == 0 ||
           isAssembledByUngroupedInsertion(write.getTensorVar())) {
         continue;
@@ -3557,7 +3557,6 @@ ir::Stmt LowererImplImperative::finalizeResultArrays(std::vector<Access> writes)
       // Post-process data structures for storing levels
       if (iterator.hasAppend()) {
         size = iterator.getPosVar();
-        cout << "Finalize size: " << size << endl;
         finalize = iterator.getAppendFinalizeLevel(parentSize, size);
       } else if (iterator.hasInsert()) {
         size = simplify(ir::Mul::make(parentSize, iterator.getWidth()));
