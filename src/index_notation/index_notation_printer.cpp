@@ -299,4 +299,10 @@ void IndexNotationPrinter::visit(const AssembleNode* op) {
   os << ")";
 }
 
+void IndexNotationPrinter::visit(const SwapNode* op) {
+  os << "swap(";
+  op->stmt.accept(this);
+  os << ")";
+}
+
 }

@@ -40,9 +40,6 @@ public:
   Format(const std::vector<ModeFormatPack>& modeFormatPacks,
          const std::vector<int>& modeOrdering);
 
-  /// Format for sparse workspace
-  Format(bool flag, const std::vector<ModeFormat>& AllFormat, const ModeFormat& AccFormat);
-
   /// Returns the number of modes in the format.
   int getOrder() const;
 

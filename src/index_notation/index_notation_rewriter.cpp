@@ -243,7 +243,9 @@ void IndexNotationRewriter::visit(const SuchThatNode* op) {
   }
 }
 
-
+void IndexNotationRewriter::visit(const SwapNode* op) {
+  stmt = rewrite(op->stmt);
+}
 
 // Functions
 #define SUBSTITUTE_EXPR                        \
@@ -356,6 +358,10 @@ struct ReplaceRewriter : public IndexNotationRewriter {
   }
 
   void visit(const SuchThatNode* op) {
+    SUBSTITUTE_STMT;
+  }
+
+  void visit(const SwapNode* op) {
     SUBSTITUTE_STMT;
   }
 };

@@ -452,6 +452,10 @@ private:
     taco_not_supported_yet;
   }
 
+  void visit(const Swap* node) {
+    taco_not_supported_yet;
+  }
+
   vector<MergePoint>
   enumerateChildrenPoints(const MergePoint& point, const map<set<Iterator>, MergePoint>& originalPoints,
                           set<set<Iterator>>& seen) {

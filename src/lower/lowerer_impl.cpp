@@ -63,6 +63,7 @@ private:
     taco_ierror << "Reduction nodes not supported in concrete index notation";
   }
   void visit(const IndexVarNode* node)          { expr = impl->lowerIndexVar(node); }
+  void visit(const SwapNode* node)           { stmt = impl->lowerSwap(node); }
 };
 
 LowererImpl::LowererImpl() : visitor(new Visitor(this)) {

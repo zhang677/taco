@@ -473,6 +473,20 @@ struct AssembleNode : public IndexStmtNode {
   Assemble::AttrQueryResults results;
 };
 
+struct SwapNode : public IndexStmtNode {
+  SwapNode(IndexStmt stmt, std::vector<IndexVar> originalVars, 
+          std::vector<IndexVar> currentVars, std::vector<IndexVar> reorderVars) 
+      : stmt(stmt), originalVars(originalVars), currentVars(currentVars), reorderVars(reorderVars) {}
+
+  void accept(IndexStmtVisitorStrict* v) const {
+    v->visit(this);
+  }
+
+  IndexStmt stmt;
+  std::vector<IndexVar> originalVars;
+  std::vector<IndexVar> currentVars;
+  std::vector<IndexVar> reorderVars;
+};
 
 /// Returns true if expression e is of type E.
 template <typename E>

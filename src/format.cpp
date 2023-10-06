@@ -52,10 +52,6 @@ Format::Format(const std::vector<ModeFormatPack>& modeFormatPacks,
       "You must either provide a complete mode ordering or none";
 }
 
-Format::Format(bool flag, const std::vector<ModeFormat>& AllFormat, const ModeFormat& AccFormat){
-  ;
-}
-
 int Format::getOrder() const {
   return (int)getModeFormats().size();
 }

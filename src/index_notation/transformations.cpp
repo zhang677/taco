@@ -101,6 +101,9 @@ IndexStmt Reorder::apply(IndexStmt stmt, string* reason) const {
   std::vector<IndexVar> currentOrdering;
   bool matchFailed = false;
 
+  std::vector<IndexVar> originalVars;
+  std::vector<IndexVar> currentVars;
+
   match(stmt,
         std::function<void(const ForallNode*)>([&](const ForallNode* op) {
           bool matches = std::find (getreplacepattern().begin(), getreplacepattern().end(), op->indexVar) != getreplacepattern().end();
@@ -114,6 +117,12 @@ IndexStmt Reorder::apply(IndexStmt stmt, string* reason) const {
         })
   );
 
+  match(stmt,
+        std::function<void(const ForallNode*)>([&](const ForallNode* op) {
+          originalVars.push_back(op->indexVar);
+        })
+  );
+
   if (!content->pattern_ordered && currentOrdering == getreplacepattern()) {
     taco_iassert(getreplacepattern().size() == 2);
     content->replacePattern = {getreplacepattern()[1], getreplacepattern()[0]};
@@ -123,7 +132,16 @@ IndexStmt Reorder::apply(IndexStmt stmt, string* reason) const {
     *reason = "The foralls of reorder pattern: " + util::join(getreplacepattern()) + " were not directly nested.";
     return IndexStmt();
   }
-  return ForAllReplace(currentOrdering, getreplacepattern()).apply(stmt, reason);
+
+  stmt = ForAllReplace(currentOrdering, getreplacepattern()).apply(stmt, reason);
+
+  match(stmt,
+        std::function<void(const ForallNode*)>([&](const ForallNode* op) {
+          currentVars.push_back(op->indexVar);
+        })
+  );
+
+  return AddSwap(currentVars, originalVars, getreplacepattern()).apply(stmt, reason);
 }
 
 void Reorder::print(std::ostream& os) const {
@@ -917,6 +935,37 @@ struct ReplaceReductionExpr : public IndexNotationRewriter {
     }
   }
 };
+
+struct AddSwap::Content {
+  std::vector<IndexVar> originalVars;
+  std::vector<IndexVar> currentVars;
+  std::vector<IndexVar> reorderVars;
+};
+
+AddSwap::AddSwap() : content(nullptr) {
+}
+
+AddSwap::AddSwap(std::vector<IndexVar> originalVars, std::vector<IndexVar> currentVars, std::vector<IndexVar> reorderVars) : content(new Content) {
+  taco_iassert(!originalVars.empty());
+  taco_iassert(!currentVars.empty());
+  content->originalVars = originalVars;
+  content->currentVars = currentVars;
+  content->reorderVars = reorderVars;
+}
+
+IndexStmt AddSwap::apply(IndexStmt stmt, string* reason) const {
+  INIT_REASON(reason);
+
+  string r;
+  if (!isConcreteNotation(stmt, &r)) {
+    *reason = "The index statement is not valid concrete index notation: " + r;
+    return IndexStmt();
+  }
+
+  return Swap(stmt, content->originalVars, content->currentVars, content->reorderVars);
+
+}
+
 
 
 IndexStmt scalarPromote(IndexStmt stmt, ProvenanceGraph provGraph, 
@@ -2201,5 +2250,155 @@ IndexStmt insertTemporaries(IndexStmt stmt)
 
   return stmt;
 }
+
+IndexStmt sparseWorkspaceInsertion(IndexStmt stmt) {
+  vector<IndexVar> reductionVars = getReductionVars(stmt);
+  std::string ws_name="w";
+  int mode;
+  SpFormat::AccType accType = SpFormat::AccType::Coord;
+  std::vector<int> ow_order;
+  std::vector<Dimension> workspaceDims;
+  Datatype workspaceDType;
+  IndexExpr precomputedExpr;
+  TensorVar outputTensorVar;
+
+  std::vector<IndexVar> outputVars;
+  std::vector<IndexVar> forallOutputVars;
+
+  // First demo only considers one Assignment node
+  // Get the precompute expression
+  match(stmt,
+        std::function<void(const AssignmentNode*)>([&](const AssignmentNode* op) {
+          precomputedExpr = op->rhs;
+          outputTensorVar = op->lhs.getTensorVar();
+          outputVars = op->lhs.getIndexVars();
+        })
+  );
+  // Get the ow order
+  match(stmt,
+        std::function<void(const ForallNode*)>([&](const ForallNode* op) {
+          auto it = std::find(outputVars.begin(), outputVars.end(), op->indexVar);
+          if (it!=outputVars.end()) {
+            forallOutputVars.push_back(op->indexVar);
+            ow_order.push_back(it - outputVars.begin());
+          }
+        })
+  );
+  // Get the output dimensions
+  for (auto& i : ow_order) {
+    workspaceDims.push_back(outputTensorVar.getType().getShape().getDimension(i));
+  }
+  workspaceDType = outputTensorVar.getType().getDataType();
+  mode = outputTensorVar.getOrder();
+  // State the workspace TensorVar
+  SpFormat wFormat = SpFormat(mode, accType);
+  TensorVar W(ws_name, Type(workspaceDType, workspaceDims), wFormat, ow_order, mode);
+  stmt = stmt.precompute(precomputedExpr, forallOutputVars, forallOutputVars, W);
+  return stmt;
+}
+
+IndexStmt checkLeftValue(IndexStmt stmt) {
+  std::vector<IndexVar> outputVars;
+  TensorVar outputTensorVar;
+  IndexExpr precomputedExpr;
+  std::vector<IndexVar> forallVars;
+  std::vector<IndexVar> leftVars;
+  std::vector<IndexVar> reductionVars;
+
+  ProvenanceGraph provgraph(stmt);
+
+  match(stmt,
+        std::function<void(const ForallNode*)>([&](const ForallNode* op) {
+          forallVars.push_back(op->indexVar);
+        }),
+        std::function<void(const AssignmentNode*)>([&](const AssignmentNode* op){
+          reductionVars = Assignment(op).getReductionVars();
+        })
+  );
+  match(stmt,
+        std::function<void(const SuchThatNode*)>([&](const SuchThatNode* op) {
+          // reverse iteration op->predicates
+          for (auto it = op->predicate.rbegin(); it != op->predicate.rend(); ++it) {
+            auto relNode = it->getNode();
+            if (it->getRelType() == IndexVarRelType::POS) {
+              const PosRelNode *posNode = static_cast<const PosRelNode*>(relNode);
+              // replace the ChildrenVar ("ipos") in forallVars with ParentVar ("i")
+              auto it2 = std::find(forallVars.begin(), forallVars.end(), posNode->getPosVar());
+              if (it2 != forallVars.end()) {
+                *it2 = posNode->getParentVar();
+              } else {
+                taco_ierror << "ChildrenVar not found in forallVars";
+              }
+            } else if (it->getRelType() == IndexVarRelType::FUSE) {
+              const FuseRelNode *fuseNode = static_cast<const FuseRelNode*>(relNode);
+              // replace the fusedVar ("j") in forallVars with outerParentVar "j0 and innerParentVar "j1" at the same position
+              auto it2 = std::find(forallVars.begin(), forallVars.end(), fuseNode->getFusedVar());
+              if (it2 != forallVars.end()) {
+                *it2 = fuseNode->getOuterParentVar();
+                forallVars.insert(it2+1, fuseNode->getInnerParentVar());
+              } else {
+                taco_ierror << "FusedVar not found in forallVars";
+              }
+            } else if (it->getRelType() == IndexVarRelType::SPLIT) {
+              const SplitRelNode *splitNode  = static_cast<const SplitRelNode*>(relNode);
+              const IndexVar& outerVar = splitNode->getOuterVar();
+              const IndexVar& innerVar = splitNode->getInnerVar();
+              const IndexVar& parentVar = splitNode->getParentVar();
+              bool isReduction = false;
+              for (auto& i : provgraph.getUnderivedAncestors(parentVar)) {
+                if (std::find(reductionVars.begin(), reductionVars.end(), i) != reductionVars.end()) {
+                  isReduction = true;
+                }
+              }
+              // replace the outerVar with ParentVar and delete the innerVar
+              auto itOut = std::find(forallVars.begin(), forallVars.end(), outerVar);
+              auto itIn = std::find(forallVars.begin(), forallVars.end(), innerVar);
+              if (itOut != forallVars.end() && itIn != forallVars.end() && itOut != itIn) {
+                if (isReduction) {
+                  if (itOut > itIn) {
+                    *itIn = parentVar;
+                    forallVars.erase(itOut);
+                  } else {
+                    *itOut = parentVar;
+                    forallVars.erase(itIn);
+                  }                  
+                }
+                else {
+                  if (itOut < itIn) {
+                    *itIn = parentVar;
+                    forallVars.erase(itOut);
+                  } else {
+                    *itOut = parentVar;
+                    forallVars.erase(itIn);
+                  }
+                }
+              } else {
+                taco_ierror << "OuterVar not found in forallVars";
+              }
+            }  else {
+              taco_ierror << "RelNode not supported yet";
+            }
+          } 
+        }),
+        std::function<void(const AssignmentNode*)>([&](const AssignmentNode* op){
+          precomputedExpr = op->rhs;
+          outputTensorVar = op->lhs.getTensorVar();
+          outputVars = op->lhs.getIndexVars();
+        })
+  );
+
+  // Get the ow order
+  std::vector<int> ow_order;
+  for (auto& i: forallVars) {
+    auto it = std::find(outputVars.begin(), outputVars.end(), i);
+    if (it!=outputVars.end()) {
+      ow_order.push_back(it - outputVars.begin());
+    }
+  }
+
+
+}
+
+
 
 }

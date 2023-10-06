@@ -303,7 +303,6 @@ private:
 
 bool operator==(const PrecomputeRelNode&, const PrecomputeRelNode&);
 
-
 /// An IndexVarprovGraph is a side IR that takes in Concrete Index Notation and supports querying
 /// relationships between IndexVars. Gets relationships from SuchThat node in Concrete Index Notation
 class ProvenanceGraph {

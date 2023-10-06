@@ -67,6 +67,7 @@ struct SequenceNode;
 struct AssembleNode;
 struct MultiNode;
 struct SuchThatNode;
+struct SwapNode;
 
 class IndexExprVisitorStrict;
 class IndexStmtVisitorStrict;
@@ -993,6 +994,18 @@ public:
 
 /// Create a multi index statement.
 Multi multi(IndexStmt stmt1, IndexStmt stmt2);
+
+class Swap : public IndexStmt {
+public:
+  Swap() = default;
+  Swap(const SwapNode*);
+  Swap(IndexStmt stmt, std::vector<IndexVar> originalVars, std::vector<IndexVar> currentVars, std::vector<IndexVar> reorderVars);
+
+  IndexStmt getStmt() const;
+  std::vector<IndexVar> getOriginalVars() const;
+  std::vector<IndexVar> getCurrentVars() const;
+  typedef SwapNode Node;
+};
 
 /// IndexVarInterface is a marker superclass for IndexVar-like objects.
 /// It is intended to be used in situations where many IndexVar-like objects

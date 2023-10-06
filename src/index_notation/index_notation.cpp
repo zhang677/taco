@@ -2417,6 +2417,35 @@ template <> SuchThat to<SuchThat>(IndexStmt s) {
   return SuchThat(to<SuchThatNode>(s.ptr));
 }
 
+// class Swap
+Swap::Swap(const SwapNode* n) : IndexStmt(n) {
+}
+
+Swap::Swap(IndexStmt stmt, std::vector<IndexVar> originalVars, std::vector<IndexVar> currentVars, std::vector<IndexVar> reorderVars)
+        : Swap(new SwapNode(stmt, originalVars, currentVars, reorderVars)) {
+}
+
+IndexStmt Swap::getStmt() const {
+  return getNode(*this)->stmt;
+}
+
+std::vector<IndexVar> Swap::getOriginalVars() const {
+  return getNode(*this)->originalVars;
+}
+
+std::vector<IndexVar> Swap::getCurrentVars() const {
+  return getNode(*this)->currentVars;
+}
+
+template <> bool isa<Swap>(IndexStmt s) {
+  return isa<SwapNode>(s.ptr);
+}
+
+template <> Swap to<Swap>(IndexStmt s) {
+  taco_iassert(isa<Swap>(s));
+  return Swap(to<SwapNode>(s.ptr));
+}
+
 // class IndexVar
 IndexVar::IndexVar() : IndexVar(util::uniqueName('i')) {}
 
@@ -2880,6 +2909,7 @@ bool isReductionNotation(IndexStmt stmt, std::string* reason) {
   match(stmt,
     std::function<void(const ReductionNode*,Matcher*)>([&](
         const ReductionNode* op, Matcher* ctx) {
+      std::cout << "Visit Reduction: " << op->var << "," << op->a << std::endl;
       boundVars.scope();
       boundVars.insert({op->var});
       ctx->match(op->a);
@@ -2893,6 +2923,12 @@ bool isReductionNotation(IndexStmt stmt, std::string* reason) {
           isReduction = false;
         }
       }
+    }),
+    std::function<void(const AssignmentNode*)>([&](const AssignmentNode* op) {
+      std::cout << "Visit Assignment: " << op->lhs << "," << op->rhs << std::endl;
+    }),
+    std::function<void(const MulNode*)>([&](const MulNode* op) {
+      std::cout << "Visit Mul: " << op->a << "," << op->b << std::endl;
     })
   );
   return isReduction;
@@ -3229,7 +3265,7 @@ IndexStmt makeConcreteNotation(IndexStmt stmt) {
   for (auto& i : util::reverse(freeVars)) {
     stmt = forall(i, stmt);
   }
-
+  std::cout << "Before replacing with wheres: " << stmt << std::endl;
   stmt = ReplaceReductionsWithWheres().rewrite(stmt);
   return stmt;
 }
@@ -3771,9 +3807,12 @@ std::vector<IndexVar> getReductionVars(IndexStmt stmt) {
     function<void(const ForallNode*,Matcher*)>([&](const ForallNode* op, 
                                                    Matcher* ctx) {
       const auto indexVars = provGraph.getUnderivedAncestors(op->indexVar);
+      std::cout << "Visit Forall: " << std::endl;
       for (const auto& iv : indexVars) {
+        std::cout << iv << ",";
         scopedVars.push_back(iv);
       }
+      std::cout << std::endl;
       ctx->match(op->stmt);
       for (size_t i = 0; i < indexVars.size(); ++i) {
         scopedVars.pop_back();
@@ -3797,7 +3836,11 @@ std::vector<IndexVar> getReductionVars(IndexStmt stmt) {
 
       auto seen = util::toSet(freeVars);
       match(op->rhs,
+        std::function<void(const MulNode*)>([&](const MulNode* op) {
+          std::cout << "Visit Mul" << std::endl;
+        }),
         std::function<void(const AccessNode*)>([&](const AccessNode* op) {
+          std::cout << "Visit: " << op->tensorVar.getName() << std::endl;
           for (const auto& var : op->indexVars) {
             if (!util::contains(seen, var)) {
               reductionVars.push_back(var);

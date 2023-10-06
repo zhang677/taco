@@ -1210,6 +1210,7 @@ ostream& operator<<(ostream& os, const TensorBase& tensor) {
       case Datatype::Float64: os << ((double*)(ptr+tensor.getOrder()))[0] << std::endl; break;
       case Datatype::Complex64: os << ((std::complex<float>*)(ptr+tensor.getOrder()))[0] << std::endl; break;
       case Datatype::Complex128: os << ((std::complex<double>*)(ptr+tensor.getOrder()))[0] << std::endl; break;
+      case Datatype::UserDefined: taco_ierror; break;
       case Datatype::Undefined: taco_ierror; break;
     }
   }

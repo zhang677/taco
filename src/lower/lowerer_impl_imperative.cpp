@@ -68,6 +68,7 @@ private:
     taco_ierror << "Reduction nodes not supported in concrete index notation";
   }
   void visit(const IndexVarNode* node)       { expr = impl->lowerIndexVar(node); }
+  void visit(const SwapNode* node)           { stmt = impl->lowerSwap(node); }
 };
 
 LowererImplImperative::LowererImplImperative() : visitor(new Visitor(this)) {
@@ -798,7 +799,7 @@ LowererImplImperative::splitAppenderAndInserters(const vector<Iterator>& results
 Stmt LowererImplImperative::lowerForall(Forall forall)
 {
   cout<<"Into lowerForall"<<endl;
-  if(!spTemporaryVars.empty() && inProducer) producerForallDepth ++;
+  if(!spTemporaryVars.empty() && inProducer) producerForallDepth ++; /// TODO[WRONG]: Change to the depth of parent indexVars
   bool hasExactBound = provGraph.hasExactBound(forall.getIndexVar());
   bool forallNeedsUnderivedGuards = !hasExactBound && emitUnderivedGuards;
   if (!ignoreVectorize && forallNeedsUnderivedGuards &&
@@ -948,8 +949,8 @@ Stmt LowererImplImperative::lowerForall(Forall forall)
 
 
 
-  //std::cout<<"temporaryValuesInit: "<<std::endl;
-  //std::cout<<temporaryValuesInitFree[0];
+  std::cout<<"temporaryValuesInit: "<<std::endl;
+  std::cout<<temporaryValuesInitFree[0];
   Stmt loops;
   // Emit a loop that iterates over over a single iterator (optimization)
   if (caseLattice.iterators().size() == 1 && caseLattice.iterators()[0].isUnique()) {
@@ -957,7 +958,7 @@ Stmt LowererImplImperative::lowerForall(Forall forall)
 
     MergePoint point = loopLattice.points()[0];
     Iterator iterator = loopLattice.iterators()[0];
-    //std::cout<<"Loop iterators: "<<util::join(loopLattice.iterators(), ", ")<<std::endl;
+    std::cout<<"Loop iterators: "<<util::join(loopLattice.iterators(), ", ")<<std::endl;
 
     vector<Iterator> locators = point.locators();
     vector<Iterator> appenders;
@@ -988,6 +989,7 @@ Stmt LowererImplImperative::lowerForall(Forall forall)
     bool canAccelWithSparseIteration =
         provGraph.isFullyDerived(iterator.getIndexVar()) &&
         iterator.isDimensionIterator() && locators.size() == 1;
+    std::cout << "CanAccelWithSparseIteration: " << canAccelWithSparseIteration << std::endl;
     if (canAccelWithSparseIteration) {
       bool indexListsExist = false;
       // We are iterating over a dimension and locating into a temporary with a tracker to keep indices. Instead, we
@@ -1027,6 +1029,7 @@ Stmt LowererImplImperative::lowerForall(Forall forall)
   }
   // Emit general loops to merge multiple iterators
   else {
+    std::cout << "Emit general loops to merge multiple iterators" << std::endl;
     std::vector<IndexVar> underivedAncestors = provGraph.getUnderivedAncestors(forall.getIndexVar());
     taco_iassert(underivedAncestors.size() == 1); // TODO: add support for fused coordinate of pos loop
     loops = lowerMergeLattice(caseLattice, underivedAncestors[0],
@@ -1748,16 +1751,19 @@ Stmt LowererImplImperative::lowerMergeLattice(MergeLattice caseLattice, IndexVar
                                     const std::set<Access>& reducedAccesses, 
                                     MergeStrategy mergestrategy)
 {
+  std::cout << "lowerMergeLattice" << std::endl;
   // Lower merge lattice always gets called from lowerForAll. So we want loop lattice
   MergeLattice loopLattice = caseLattice.getLoopLattice();
-
+  std::cout << "Get loopLattice" << std::endl;
   Expr coordinate = getCoordinateVar(coordinateVar);
+  std::cout << "Get coodinate" << std::endl;
   vector<Iterator> appenders = filter(loopLattice.results(),
                                       [](Iterator it){return it.hasAppend();});
-
+  std::cout << "Get appenders" << std::endl;
   vector<Iterator> mergers = loopLattice.points()[0].mergers();
-  Stmt iteratorVarInits = codeToInitializeIteratorVars(loopLattice.iterators(), loopLattice.points()[0].rangers(), mergers, coordinate, coordinateVar);
-
+  std::cout << "Get mergers" << std::endl;
+  Stmt iteratorVarInits = codeToInitializeIteratorVars(loopLattice.iterators(), loopLattice.points()[0].rangers(), mergers, coordinate, coordinateVar); // Fail
+  std::cout << "Get iteratorVarInits" << std::endl;
   // if modeiteratornonmerger then will be declared in codeToInitializeIteratorVars
   auto modeIteratorsNonMergers =
           filter(loopLattice.points()[0].iterators(), [mergers](Iterator it){
@@ -3153,6 +3159,10 @@ Stmt LowererImplImperative::lowerSuchThat(SuchThat suchThat) {
   return Block::make(stmt);
 }
 
+Stmt LowererImplImperative::lowerSwap(Swap swap) {
+  Stmt stmt = lower(swap.getStmt());
+  return Block::make(stmt);
+}
 
 Expr LowererImplImperative::lowerAccess(Access access) {
   if (access.isAccessingStructure()) {
@@ -3871,6 +3881,7 @@ Stmt LowererImplImperative::reduceDuplicateCoordinates(Expr coordinate,
 }
 
 Stmt LowererImplImperative::codeToInitializeIteratorVar(Iterator iterator, vector<Iterator> iterators, vector<Iterator> rangers, vector<Iterator> mergers, Expr coordinate, IndexVar coordinateVar) {
+  std::cout << "codeToInitializeIteratorVar" << std::endl;
   vector<Stmt> result;
   taco_iassert(iterator.hasPosIter() || iterator.hasCoordIter() ||
                iterator.isDimensionIterator());
@@ -3878,6 +3889,7 @@ Stmt LowererImplImperative::codeToInitializeIteratorVar(Iterator iterator, vecto
   Expr iterVar = iterator.getIteratorVar();
   Expr endVar = iterator.getEndVar();
   if (iterator.hasPosIter()) {
+    std::cout << "hasPosIter" << std::endl;
     Expr parentPos = iterator.getParent().getPosVar();
     if (iterator.getParent().isRoot() || iterator.getParent().isUnique()) {
       // E.g. a compressed mode without duplicates
@@ -3935,6 +3947,7 @@ Stmt LowererImplImperative::codeToInitializeIteratorVar(Iterator iterator, vecto
     }
   }
   else if (iterator.hasCoordIter()) {
+    std::cout << "hasCoordIter" << std::endl;
     // E.g. a hasmap mode
     vector<Expr> coords = coordinates(iterator);
     coords.erase(coords.begin());
@@ -3944,6 +3957,7 @@ Stmt LowererImplImperative::codeToInitializeIteratorVar(Iterator iterator, vecto
     result.push_back(VarDecl::make(endVar, bounds[1]));
   }
   else if (iterator.isDimensionIterator()) {
+    std::cout << "isDimensionIterator" << std::endl;
     // A dimension
     // If a merger then initialize to 0
     // If not then get first coord value like doing normal merge
@@ -3951,30 +3965,36 @@ Stmt LowererImplImperative::codeToInitializeIteratorVar(Iterator iterator, vecto
     // If derived then need to recoverchild from this coord value
     bool isMerger = find(mergers.begin(), mergers.end(), iterator) != mergers.end();
     if (isMerger) {
+      std::cout << "isMerger" << std::endl;
       Expr coord = coordinates(vector<Iterator>({iterator}))[0];
       result.push_back(VarDecl::make(coord, 0));
     }
     else {
+      std::cout << "is not Merger" << std::endl;
       result.push_back(codeToLoadCoordinatesFromPosIterators(iterators, true));
 
       Stmt stmt = resolveCoordinate(mergers, coordinate, true, false);
       taco_iassert(stmt != Stmt());
       result.push_back(stmt);
       result.push_back(codeToRecoverDerivedIndexVar(coordinateVar, iterator.getIndexVar(), true));
-
+      std::cout << "To emit Bound" << std::endl;
       // emit bound for ranger too
       vector<Expr> startBounds;
       vector<Expr> endBounds;
       for (Iterator merger : mergers) {
+        std::cout << merger.getParent() << "," << merger.getParent().getPosVar() << std::endl;
         ModeFunction coordBounds = merger.coordBounds(merger.getParent().getPosVar());
+        std::cout << coordBounds << std::endl;
         startBounds.push_back(coordBounds[0]);
         endBounds.push_back(coordBounds[1]);
       }
+      std::cout << "Bound emitted" << std::endl;
       //TODO: maybe needed after split reorder? underivedBounds[coordinateVar] = {ir::Max::make(startBounds), ir::Min::make(endBounds)};
       Stmt end_decl = VarDecl::make(iterator.getEndVar(), provGraph.deriveIterBounds(iterator.getIndexVar(), definedIndexVarsOrdered, underivedBounds, indexVarToExprMap, this->iterators)[1]);
       result.push_back(end_decl);
     }
   }
+  std::cout << "Finish InitializeIteratorVar" << std::endl;
   return result.empty() ? Stmt() : Block::make(result);
 }
 
@@ -3984,12 +4004,14 @@ Stmt LowererImplImperative::codeToInitializeIteratorVars(vector<Iterator> iterat
   for (Iterator iterator : mergers) {
     results.push_back(codeToInitializeIteratorVar(iterator, iterators, rangers, mergers, coordinate, coordinateVar));
   }
-
+  std::cout << "Finish mergers" << std::endl;
   for (Iterator iterator : rangers) {
       if (find(mergers.begin(), mergers.end(), iterator) == mergers.end()) {
+        std::cout << "Merger push back" << std::endl;
         results.push_back(codeToInitializeIteratorVar(iterator, iterators, rangers, mergers, coordinate, coordinateVar));
       }
   }
+  std::cout << "Finish rangers" << std::endl;
   return results.empty() ? Stmt() : Block::make(results);
 }
 

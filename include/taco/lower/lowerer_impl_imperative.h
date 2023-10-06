@@ -212,6 +212,9 @@ protected:
   /// Lower a suchthat statement.
   virtual ir::Stmt lowerSuchThat(SuchThat suchThat);
 
+  /// Lower a swap statement.
+  virtual ir::Stmt lowerSwap(Swap swap);
+
   /// Lower an access expression.
   virtual ir::Expr lowerAccess(Access access);
 

@@ -227,6 +227,21 @@ private:
 /// Print a SetMergeStrategy command.
 std::ostream &operator<<(std::ostream &, const SetMergeStrategy&);
 
+class AddSwap : public TransformationInterface {
+public:
+  AddSwap();
+  AddSwap(std::vector<IndexVar> originalVars, std::vector<IndexVar> currentVars, 
+          std::vector<IndexVar> reorderVars);
+
+  IndexStmt apply(IndexStmt stmt, std::string *reason = nullptr) const;
+
+  void print(std::ostream &os) const;
+
+private:
+  struct Content;
+  std::shared_ptr<Content> content;
+};
+
 // Autoscheduling functions
 
 /**
@@ -257,6 +272,16 @@ IndexStmt scalarPromote(IndexStmt stmt);
  * 1. The result is a is scattered into but does not support random insert.
  */
 IndexStmt insertTemporaries(IndexStmt stmt);
+
+/**
+ * Detect discordancy and insert sparse workspace
+ */
+IndexStmt sparseWorkspaceInsertion(IndexStmt stmt);
+
+/**
+ * Insert the OuterProduct-like discordancy
+ */
+IndexStmt workspaceInsertion(IndexStmt stmt);
 
 }
 #endif

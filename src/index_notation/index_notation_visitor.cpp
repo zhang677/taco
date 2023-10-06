@@ -132,4 +132,8 @@ void IndexNotationVisitor::visit(const SuchThatNode* op) {
   op->stmt.accept(this);
 }
 
+void IndexNotationVisitor::visit(const SwapNode* op) {
+  op->stmt.accept(this);
+}
+
 }
