@@ -788,7 +788,7 @@ TEST(scheduling_eval, SpGEMM_outerproduct) {
   float SPARSITY = .2;
   Format aFormat = CSC;
   Format bFormat = CSR;
-  Format cFormat = CSR;
+  Format cFormat = {Dense, Dense};
   Tensor<float> A("A",{NUM_I, NUM_J},aFormat);
   Tensor<float> B("B",{NUM_J, NUM_K},bFormat);
   Tensor<float> C("C",{NUM_I, NUM_K},cFormat);
@@ -816,10 +816,9 @@ TEST(scheduling_eval, SpGEMM_outerproduct) {
 
   IndexExpr precomputedExpr = A(i, j) * B(j, k);
   C(i, k) = precomputedExpr;
-  TensorVar W("w", Type(Float32,{(size_t)NUM_I, (size_t)NUM_K}), {Dense, Dense});
   IndexStmt stmt = C.getAssignment().concretize();
 
-  stmt = stmt.reorder({j,i,k}).precompute(precomputedExpr, {i,k}, {i,k}, W);
+  stmt = stmt.reorder({j,i,k});
   cout<<"stmt: "<<stmt<<endl;
 
   C.compile(stmt);

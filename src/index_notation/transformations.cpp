@@ -966,6 +966,9 @@ IndexStmt AddSwap::apply(IndexStmt stmt, string* reason) const {
 
 }
 
+void AddSwap::print(std::ostream& os) const {
+  os << "addswap";
+}
 
 
 IndexStmt scalarPromote(IndexStmt stmt, ProvenanceGraph provGraph, 

@@ -4223,6 +4223,11 @@ private:
       stmt = new SuchThatNode(body, op->predicate);
     }
   }
+
+  void visit(const SwapNode* op) {
+    taco_not_supported_yet;
+  }
+
 };
 
 IndexExpr zero(IndexExpr expr, const set<Access>& zeroed) {
