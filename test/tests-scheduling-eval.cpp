@@ -836,6 +836,60 @@ TEST(scheduling_eval, spWS_discordant_SpGEMM) {
   ASSERT_EQ(1,1);
 }
 
+TEST(scheduling_eval, spWS_gustavson_SpGEMM) {
+  int NUM_I = 50;
+  int NUM_J = 100;
+  int NUM_K = 150;
+  float SPARSITY = .2;
+  // Format aFormat = COO(2,true,true,false,{0,1}); // order, isUnique, isOrdered, isAoS(array-of-struct), modeOrdering
+  Format aFormat = DCSR;
+  Format bFormat = DCSR;
+  Format cFormat = CSR;
+  //SpFormat wFormat = SpFormat(COO(2,true,true,false,{0,1}), SpFormat::Coord);
+  SpFormat wFormat = SpFormat(2, SpFormat::Coord);
+  Tensor<float> A("A",{NUM_I, NUM_J},aFormat);
+  Tensor<float> B("B",{NUM_J, NUM_K},bFormat);
+  Tensor<float> C("C",{NUM_K, NUM_I},cFormat);
+  C.userSetNeedsValueSize(false);
+  srand(75883);
+  for (int i = 0; i < NUM_I; i++) {
+    for (int j = 0; j < NUM_J; j++) {
+      float rand_float = (float)rand()/(float)(RAND_MAX);
+      if (rand_float < SPARSITY) {
+        A.insert({i, j}, (float) ((int) (rand_float*3/SPARSITY)));
+      }
+    }
+  }
+
+  for (int j = 0; j < NUM_J; j++) {
+    for (int k = 0; k < NUM_K; k++) {
+      float rand_float = (float)rand()/(float)(RAND_MAX);
+      if (rand_float < SPARSITY) {
+        B.insert({j, k}, (float) ((int) (rand_float*3/SPARSITY)));
+      }
+    }
+  }
+
+  A.pack();
+  B.pack();
+
+  C(k, i) = A(i, j) * B(j, k);
+  TensorVar W("w", Type(Float32,{(size_t)NUM_I, (size_t)NUM_K}), wFormat, {1,0}, 3);
+  IndexExpr precomputedExpr = A(i, j) * B(j, k);
+  C(k, i) = precomputedExpr;
+
+  IndexStmt stmt = C.getAssignment().concretize();
+
+  stmt = stmt.reorder({i,j,k});
+  stmt = stmt.precompute(precomputedExpr, {i,k}, {i,k}, W);
+  cout<<"stmt: "<<stmt<<endl;
+
+  C.compile(stmt);
+  C.assemble();
+  C.compute();
+  cout<<C<<endl;
+  ASSERT_EQ(1,1);
+}
 
 TEST(scheduling_eval, spWS_discordant_TTV) {
   int NUM_I = 50;
@@ -1008,6 +1062,232 @@ TEST(scheduling_eval, spWS_discordant_MTTKRP) {
   A.assemble();
   A.compute();
   cout<<A<<endl;
+  ASSERT_EQ(1,1);
+}
+
+TEST(scheduling_eval, spWS_coiteration_MTTKRP) {
+  int NUM_I = 5;
+  int NUM_J = 10;
+  int NUM_K = 15;
+  int NUM_L = 20;
+  float SPARSITY = .2;
+  Format aFormat = {Dense, Dense};
+  Format bFormat = {Sparse, Sparse, Sparse};
+  Format cFormat = DCSR;
+  Format dFormat = DCSR;
+  Tensor<float> A("A",{NUM_I, NUM_J},aFormat);
+  Tensor<float> B("B",{NUM_K, NUM_L, NUM_I},bFormat);
+  Tensor<float> C("C",{NUM_K, NUM_J},cFormat);
+  Tensor<float> D("D",{NUM_L, NUM_J},cFormat);
+  A.userSetNeedsValueSize(false);
+  srand(75883);
+  for (int k = 0; k < NUM_K; k++) {
+    for (int l = 0; l < NUM_L; l++) {
+      for (int i = 0; i < NUM_I; i++) {
+        float rand_float = (float) rand() / (float) (RAND_MAX);
+        if (rand_float < SPARSITY) {
+          B.insert({k, l, i}, (float) ((int) (rand_float * 3 / SPARSITY)));
+        }
+      }
+    }
+  }
+
+  for (int k = 0; k < NUM_K; k++) {
+    for (int j = 0; j < NUM_J; j++) {
+      float rand_float = (float)rand()/(float)(RAND_MAX);
+      C.insert({k, j}, (float) ((int) (rand_float*3)));
+    }
+  }
+
+  for (int l = 0; l < NUM_L; l++) {
+    for (int j = 0; j < NUM_J; j++) {
+      float rand_float = (float)rand()/(float)(RAND_MAX);
+      D.insert({l, j}, (float) ((int) (rand_float*3)));
+    }
+  }
+
+  B.pack();
+  C.pack();
+  D.pack();
+
+  // A["ij"] = B["kli"] * C["kj"] * D["lj"];
+  A(i,j) = B(k,l,i) * C(k,j) * D(l,j);
+
+  IndexExpr precomputedExpr = B(k,l,i) * C(k,j) * D(l,j);
+  A(i,j) = precomputedExpr;
+
+  IndexStmt stmt = A.getAssignment().concretize();
+
+  stmt = stmt.reorder({k,l,i,j});
+  cout<<"stmt: "<<stmt<<endl;
+
+  A.compile(stmt, false, false);
+  A.assemble();
+  A.compute();
+  cout<<A<<endl;
+  ASSERT_EQ(1,1);
+}
+
+TEST(scheduling_eval, spWS_coiteration_TTM) {
+  int NUM_I = 5;
+  int NUM_J = 10;
+  int NUM_K = 15;
+  int NUM_L = 20;
+  float SPARSITY = .2;
+  Format aFormat = {Dense, Dense, Dense};
+  Format bFormat = {Sparse, Sparse, Sparse};
+  Format cFormat = DCSR;
+  Tensor<float> A("A",{NUM_I, NUM_J, NUM_L},aFormat);
+  Tensor<float> B("B",{NUM_K, NUM_I, NUM_J},bFormat);
+  Tensor<float> C("C",{NUM_K, NUM_L},cFormat);
+  A.userSetNeedsValueSize(false);
+  srand(75883);
+  for (int k = 0; k < NUM_K; k++) {
+    for (int i = 0; i < NUM_I; i++) {
+      for (int j = 0; j < NUM_J; j++) {
+        float rand_float = (float) rand() / (float) (RAND_MAX);
+        if (rand_float < SPARSITY) {
+          B.insert({k, i, j}, (float) ((int) (rand_float * 3 / SPARSITY)));
+        }
+      }
+    }
+  }
+
+  for (int k = 0; k < NUM_K; k++) {
+    for (int l = 0; l < NUM_L; l++) {
+      float rand_float = (float)rand()/(float)(RAND_MAX);
+      C.insert({k, l}, (float) ((int) (rand_float*3)));
+    }
+  }
+
+  B.pack();
+  C.pack();
+
+  // A["ijl"] = B["kij"] * C["kl"];
+  IndexExpr precomputedExpr = B(k,i,j) * C(k,l);
+  A(i,j,l) = precomputedExpr;
+
+  IndexStmt stmt = A.getAssignment().concretize();
+
+  stmt = stmt.reorder({k,i,j,l});
+  cout<<"stmt: "<<stmt<<endl;
+
+  A.compile(stmt, false, false);
+  A.assemble();
+  A.compute();
+  cout<<A<<endl;
+  ASSERT_EQ(1,1);
+}
+
+TEST(scheduling_eval, SpGEMM_outerproduct) {
+  int NUM_I = 50;
+  int NUM_J = 100;
+  int NUM_K = 150;
+  float SPARSITY = .2;
+  Format aFormat = DCSC;
+  Format bFormat = DCSR;
+  Format cFormat = {Dense, Dense};
+  Tensor<float> A("A",{NUM_I, NUM_J},aFormat);
+  Tensor<float> B("B",{NUM_J, NUM_K},bFormat);
+  Tensor<float> C("C",{NUM_I, NUM_K},cFormat);
+  C.userSetNeedsValueSize(false);
+  for (int i = 0; i < NUM_I; i++) {
+    for (int j = 0; j < NUM_J; j++) {
+      float rand_float = (float)rand()/(float)(RAND_MAX);
+      if (rand_float < SPARSITY) {
+        A.insert({i, j}, (float) ((int) (rand_float*3/SPARSITY)));
+      }
+    }
+  }
+
+  for (int j = 0; j < NUM_J; j++) {
+    for (int k = 0; k < NUM_K; k++) {
+      float rand_float = (float)rand()/(float)(RAND_MAX);
+      if (rand_float < SPARSITY) {
+        B.insert({j, k}, (float) ((int) (rand_float*3/SPARSITY)));
+      }
+    }
+  }
+
+  A.pack();
+  B.pack();
+
+  IndexExpr precomputedExpr = A(i, j) * B(j, k);
+  C(i, k) = precomputedExpr;
+  IndexStmt stmt = C.getAssignment().concretize();
+
+  stmt = stmt.reorder({j,i,k});
+  cout<<"stmt: "<<stmt<<endl;
+
+  C.compile(stmt);
+  C.assemble();
+  C.compute();
+  cout<<C<<endl;
+  ASSERT_EQ(1,1);
+}
+
+TEST(scheduling_eval, stmt_SpGEMM_outerproduct) {
+  int NUM_I = 50;
+  int NUM_J = 100;
+  int NUM_K = 150;
+  Format aFormat = CSC;
+  Format bFormat = CSR;
+  Format cFormat = {Dense, Dense};
+  Tensor<float> A("A",{NUM_I, NUM_J},aFormat);
+  Tensor<float> B("B",{NUM_J, NUM_K},bFormat);
+  Tensor<float> C("C",{NUM_I, NUM_K},cFormat);
+  IndexExpr precomputedExpr = A(i, j) * B(j, k);
+  C(i, k) = precomputedExpr;
+  IndexStmt stmt = C.getAssignment().concretize();
+  // Test1: reorder
+//  stmt = stmt.reorder({j,k,i});
+  // Test2: reorder + split
+//  stmt = stmt.reorder({j,k,i});
+//  IndexVar i0("i0"), i1("i1");
+//  stmt = stmt.split(i, i0, i1, 2);
+  // Test3: reorder + split (non-reduction) + reorder
+//  stmt = stmt.reorder({j,k,i});
+//  IndexVar k0("k0"), k1("k1");
+//  stmt = stmt.split(k, k0, k1, 2);
+//  stmt = stmt.reorder({j, k0, i, k1});
+  // Test4: reorder + split (reduction) + reorder
+//  stmt = stmt.reorder({j,k,i});
+//  IndexVar j0("j0"), j1("j1");
+//  stmt = stmt.split(j, j0, j1, 2);
+//  stmt = stmt.reorder({j0, k, j1, i});
+  cout << "Input: " << stmt << endl;
+  IndexStmt stmt2 = insertSparseWorkspace(stmt);
+  cout << stmt2 << endl;
+  ASSERT_EQ(1,1);
+}
+
+TEST(scheduling_eval, stmt_SpTTM) {
+  int NUM_I = 5;
+  int NUM_J = 10;
+  int NUM_K = 15;
+  int NUM_L = 20;
+  Format aFormat = {Dense, Dense, Dense};
+  Format bFormat = {Sparse, Sparse, Sparse};
+  Format cFormat = {Dense, Dense};
+  SpFormat wFormat = SpFormat(3, SpFormat::Coord);
+  Tensor<float> A("A",{NUM_I, NUM_J, NUM_L},aFormat);
+  Tensor<float> B("B",{NUM_I, NUM_J, NUM_K},bFormat);
+  Tensor<float> C("C",{NUM_K, NUM_L},cFormat);
+
+
+  A(i,j,l) = B(i,j,k) * C(k,l);
+  IndexStmt stmt = A.getAssignment().concretize();
+  // Test5: fuse + reorder + pos + split
+  IndexVar jk("jk"), f("f"), fpos("fpos"), block("block"), fpos1("fpos1");
+  stmt = stmt.reorder({i, j, k, l});
+  stmt = stmt.fuse(j, k, jk);
+  stmt = stmt.fuse(i, jk, f);
+  stmt = stmt.pos(f, fpos, B(i, j, k));
+  stmt = stmt.split(fpos, block, fpos1, 2);
+  stmt = stmt.reorder({l, block, fpos1});
+  cout << "Input: " << stmt << endl;
+  IndexStmt stmt2 = insertSparseWorkspace(stmt);
+  cout << stmt2 << endl;
   ASSERT_EQ(1,1);
 }
 

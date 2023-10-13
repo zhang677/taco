@@ -258,5 +258,12 @@ IndexStmt scalarPromote(IndexStmt stmt);
  */
 IndexStmt insertTemporaries(IndexStmt stmt);
 
+/**
+ * Insert where statements with sparse workspaces.
+ * No 'Where' in the original stmt
+ * Only has pos, fuse, split, reorder predicates
+*/
+IndexStmt insertSparseWorkspace(IndexStmt stmt);
+
 }
 #endif
